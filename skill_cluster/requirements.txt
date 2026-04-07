@@ -1,0 +1,15 @@
+# Core data processing
+numpy
+jsonlines
+
+# Machine learning & clustering
+scikit-learn
+umap-learn
+
+# NLP & embeddings
+nltk
+llama-index-core
+llama-index-embeddings-huggingface
+
+# Utilities
+tqdm
