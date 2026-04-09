@@ -1,0 +1,100 @@
+# Agriculture Domain — Cross-Folder Data Connection Guide
+
+## Data Source Overview
+
+### Crop Yield Prediction Dataset/
+CSV files on global agricultural production factors (pesticide usage, rainfall, temperature, crop yields) by country and year. Files share "Area" (country name) and "Year" as common keys internally.
+
+- **pesticides.csv**: Pesticide usage (tonnes) by country and year.
+- **rainfall.csv**: Average annual rainfall (mm/year) by country.
+- **temp.csv**: Average temperature (°C) by country and year.
+- **yield.csv**: Crop yield (hg/ha) by country, crop item, and year.
+
+### ne_50m_admin_0_countries/
+Natural Earth shapefile — 242 world country/territory polygons with demographic (POP_EST), economic (GDP_MD, ECONOMY, INCOME_GRP), and geographic (CONTINENT, SUBREGION) attributes.
+
+### Crop Recommendation using Soil Properties and Weather Prediction.csv
+Single CSV with 3,867 records and 29 columns. Each row represents a soil–weather sample mapped to a recommended crop type (the "label" column). Contains:
+
+- **Soil properties**: Soilcolor (categorical), Ph, K (potassium), P (phosphorus), N (nitrogen), Zn (zinc), S (sulfur).
+- **Seasonal weather** (NASA POWER variables, suffixed by season — W=Winter, Sp=Spring, Su=Summer, Au=Autumn): QV2M (specific humidity), T2M_MAX (max temperature), T2M_MIN (min temperature), PRECTOTCORR (corrected precipitation).
+- **Other climate**: WD10M (wind direction), GWETTOP (surface soil wetness), CLOUD_AMT (cloud amount), WS2M_RANGE (wind speed range), PS (surface pressure).
+- **Target label**: 12 crop types (Barley, Bean, Dagussa, Fallow, Maize, Niger seed, Pea, Potato, Red Pepper, Sorghum, Teff, Wheat).
+
+### globalfoodprices_wfp.csv
+WFP Global Food Prices Database — ~2.05 million records of monthly commodity prices across 98 countries from 1990 to 2021. Contains:
+
+- **Geography**: adm0_id/adm0_name (country), adm1_id/adm1_name (region/province), mkt_id/mkt_name (market).
+- **Commodity**: cm_id/cm_name (commodity name, e.g., "Wheat", "Rice", "Maize (white)", "Fuel (diesel)", "Livestock (goat)").
+- **Price**: cur_id/cur_name (currency code), pt_id/pt_name (price type: Retail, Wholesale, Farm Gate, Producer), um_id/um_name (unit of measure, heterogeneous — KG, L, Loaf, Dozen, etc.), mp_price (price value).
+- **Time**: mp_month, mp_year.
+
+Note: um_name is highly heterogeneous (130+ distinct units including "KG", "50 KG", "Gallon", "Loaf", etc.), requiring careful unit normalization before cross-commodity or cross-country comparisons.
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: Country Name (semantic match across all sources)
+- Crop Yield CSVs: "Area" column
+- Shapefile: "NAME" or "ADMIN" column
+- Food Prices: "adm0_name" column
+- All three are semantically equivalent but have spelling/encoding differences (e.g., "Côte D'Ivoire" vs "Cote d'Ivoire"). Fuzzy matching or ISO codes (shapefile ISO_A3) can bridge.
+
+### Connection 2: Crop/Commodity Name (semantic match)
+- yield.csv "Item" column has crop names (e.g., "Maize", "Wheat", "Potatoes").
+- Food Prices "cm_name" column has commodity names (e.g., "Maize (white)", "Wheat - Retail").
+- Crop Recommendation "label" column has crop types (e.g., "Maize", "Wheat", "Potato").
+- Matching requires string normalization (stripping parenthetical qualifiers, lowercasing, handling plurals).
+
+### Connection 3: Climate Variables (semantic overlap, NOT identical columns)
+- Crop Yield CSVs: annual avg_temp, average_rain_fall_mm_per_year.
+- Crop Recommendation: seasonal T2M_MAX/T2M_MIN (per season), PRECTOTCORR (per season), GWETTOP, CLOUD_AMT.
+- These measure related concepts at different granularity (annual vs. seasonal). Aggregating seasonal values or comparing ranges can link them.
+
+### Connection 4: Time Dimension
+- Crop Yield CSVs and Food Prices both have year-level data with overlapping range (1990–2013 in yield data, 1990–2021 in food prices). Joining on (country, year) enables temporal analysis.
+- Crop Recommendation has no explicit time column; it represents static soil–climate profiles.
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+### Patterns involving Crop Yield + Shapefile (existing)
+
+1. **Geospatial Crop Analysis**: Join crop yield/pesticide/rainfall data with country polygons for choropleth maps or spatial statistics (continent-level aggregations, spatial autocorrelation).
+
+2. **Economic-Agricultural Correlation**: Merge GDP_MD/INCOME_GRP/ECONOMY from the shapefile with crop yield and pesticide data to analyze relationships between economic development and agricultural practices.
+
+3. **Continental/Regional Aggregation**: Use CONTINENT or SUBREGION from the shapefile to group crop data by geographic region, comparing yields, pesticide intensity, or climate factors across continents.
+
+
+### Patterns involving Food Prices
+
+5. **Food Price Time Series Analysis**: Analyze monthly price trends, seasonal decomposition, and volatility for specific commodities across countries. Detect anomalous price spikes and relate them to external events.
+
+6. **Price–Yield Relationship**: Join food prices (adm0_name, mp_year) with crop yields (Area, Year) for overlapping commodities to examine whether higher yields correlate with lower market prices (supply–price elasticity).
+
+7. **Regional Price Disparity**: Aggregate food prices by adm1_name (province) within a country, compute price coefficients of variation across markets, and join with shapefile SUBREGION to visualize geographic price disparities.
+
+8. **Currency and Unit Normalization Pipeline**: Clean the highly heterogeneous um_name and cur_name columns in the food prices data — convert all prices to a common unit (e.g., USD per KG) before cross-country comparison. This exercises advanced string parsing and conditional transformation skills.
+
+9. **Food Inflation vs. Economic Development**: Join food price trends with GDP_MD/INCOME_GRP from the shapefile to analyze whether low-income countries experience sharper commodity price inflation.
+
+### Patterns involving Crop Recommendation (Soil/Weather)
+
+10. **Crop Recommendation Classification**: Build a multi-class classifier (Decision Tree, Random Forest, KNN, etc.) to predict the recommended crop type from soil and weather features. Evaluate with accuracy, F1-score, confusion matrix.
+
+11. **Soil Nutrient Profiling and Clustering**: Cluster soil samples by nutrient profiles (N, P, K, Zn, S, Ph) using KMeans or hierarchical clustering, then analyze which crop types dominate each cluster.
+
+12. **Seasonal Weather Feature Engineering**: Compute derived features from the seasonal variables (e.g., annual temperature range = max(T2M_MAX) − min(T2M_MIN), total precipitation = sum of PRECTOTCORR across seasons) and analyze their importance for crop recommendation.
+
+13. **Soil–Climate Interaction Analysis**: Explore interactions between soil properties (Ph, N, P, K) and climate variables (temperature, precipitation) using PCA, correlation heatmaps, or partial dependence plots to understand which combinations favor specific crops.
+
+### Patterns involving 3+ sources
+
+14. **Full Agriculture Pipeline**: (a) Merge yield data with food prices on country+year+crop, (b) join with shapefile for economic/geographic context, (c) use crop recommendation soil profiles to characterize growing conditions, (d) build a comprehensive regression or ensemble model predicting either yield or price from all available features.
+
+15. **Crop Suitability vs. Actual Production**: Compare the crops recommended by the soil/weather model with actual crop yields from yield.csv — identify countries where the most-produced crop differs from the soil-optimal recommendation, and correlate with economic indicators from the shapefile.
+
+16. **Multi-Scale Climate Comparison**: Compare the annual climate summaries (temp.csv, rainfall.csv) with the seasonal granularity in the crop recommendation data. Investigate whether seasonal climate variation (intra-year range) is a better predictor of crop suitability than annual averages.

@@ -1,0 +1,53 @@
+# Transportation Domain — Cross-Folder Data Connection Guide
+
+## Subfolder & File Overview
+
+### yellow_tripdata/
+NYC Yellow Taxi trip records (Parquet, Jan–Sep 2024, ~3M rows/month). Each trip has pickup/dropoff zone IDs (PULocationID, DOLocationID), timestamps, fare breakdown, and trip metrics.
+
+### taxi_zones/
+NYC TLC zone boundaries (Shapefile, 263 zones). Each zone has a LocationID, zone name, borough, and polygon geometry.
+
+### ncr_ride_bookings.csv (standalone)
+Ride-hailing booking data from India's National Capital Region. Contains booking status, vehicle type, pickup/drop locations (Indian city names), fare, ratings, etc.
+
+### NTAD GeoPackage (standalone)
+US Census Bureau commuting mode data at census-tract level (85,116 tracts). Each tract has counts/percentages for car, public transit, bicycle, walk, and work-from-home commuting. Includes STATEFP (state FIPS code; New York = "36") and polygon geometry.
+
+---
+
+## Cross-Folder Connection Points
+
+### Connection 1: yellow_tripdata ↔ taxi_zones (Key Join)
+- PULocationID / DOLocationID → LocationID
+- Enriches trips with zone name, borough, and geometry.
+
+### Connection 2: taxi_zones ↔ NTAD GeoPackage (Spatial Join)
+- Both have polygon geometries. Filter NTAD to New York (STATEFP = "36") and spatially join with taxi zones to correlate taxi demand with commuting mode shares.
+
+### Connection 3: yellow_tripdata ↔ NTAD (via taxi_zones as bridge)
+- First join trips with taxi_zones for geometry, then spatially join with NTAD tracts to link trip patterns with commuting behavior.
+
+### Connection 4: ncr_ride_bookings ↔ yellow_tripdata (Thematic / Comparative)
+- No direct key join. Compare aggregate statistics: trip distance/fare distributions, peak-hour patterns, cancellation rates, vehicle-type mix across two cities (NYC vs NCR).
+
+### Connection 5: ncr_ride_bookings ↔ NTAD (Thematic)
+- Compare ride-hailing patterns in an emerging market with US census commuting mode distributions.
+
+---
+
+## Suggested Cross-Folder Analysis Patterns
+
+1. **Zone-Level Trip Intensity + Commuting Mode**: Aggregate taxi trips per zone (via taxi_zones join), then spatially join with NTAD (NYC tracts) to compare taxi pickup density against public transit commuting percentages.
+
+2. **Borough-Level Multi-Modal Analysis**: Group taxi trips by borough (via taxi_zones), compute average fares and distances per borough, then correlate with borough-level car-alone (CA_P) and public-transit (PT_P) commuting from NTAD.
+
+3. **Temporal Trip Pattern + Commuting Zones**: Analyze taxi trip volumes by hour/day, identify peak commuting zones, and cross-reference with NTAD work-from-home (WFH_P) rates in those zones.
+
+4. **Cross-City Ride Comparison**: Compare NYC yellow taxi metrics (fare, distance, time-of-day) with NCR ride-hailing metrics (booking value, ride distance, peak hours, cancellation rates).
+
+5. **Cancellation & Service Quality Pipeline**: From ncr_ride_bookings compute cancellation rates by vehicle type/location; from yellow_tripdata compute completion rates and tip percentages; join both with geographic context.
+
+6. **Multi-Month Trend + Zone Geography**: Concatenate monthly yellow_tripdata files, compute month-over-month trends per zone, join with taxi_zones for spatial visualization, and correlate with NTAD commuting shares.
+
+7. **Airport Trip Analysis**: Filter yellow_tripdata for airport trips (Airport_fee > 0 or airport zone IDs in taxi_zones), analyze fare patterns, and compare with NCR ride patterns for airport-adjacent locations.

@@ -1,0 +1,83 @@
+# Sports Domain — Cross-Source Data Connection Guide
+
+## Data Source Overview
+
+### European_Soccer_database.sqlite
+SQLite database with 7 tables covering European club football (2008–2016). ~11K players, ~300 teams, ~26K matches across 11 leagues/countries. Includes FIFA-based player skill ratings and team tactical attributes, plus match betting odds from multiple bookmakers.
+
+- **Player / Player_Attributes**: Player biographical info (name, birthday, height, weight) and detailed skill ratings (overall_rating, potential, pace, shooting, passing, dribbling, defending, etc.) linked via player_api_id.
+- **Team / Team_Attributes**: Club names and tactical profiles (buildUpPlaySpeed, chanceCreationPassing, defencePressure, etc.) linked via team_api_id.
+- **Match**: Match results with home/away goals, lineup (11 players per side), and betting odds from 10 bookmakers. Foreign keys to Country, League, Team, Player.
+- **League / Country**: 11 European leagues (England, Spain, Germany, Italy, France, etc.) with country mapping.
+
+### NBA Database/
+16 CSVs covering NBA basketball. ~4.8K players, 30 teams, ~65K games. Internal join keys: team_id, player_id, game_id.
+
+- **player.csv / common_player_info.csv**: Player roster (name, birthdate, height, weight, country, school, position, draft_year, team_id).
+- **team.csv / team_details.csv / team_history.csv / team_info_common.csv**: Team info (name, city, state, arena, conference, division, win/loss record).
+- **game.csv / game_info.csv / game_summary.csv / line_score.csv / other_stats.csv**: Game results with detailed box score stats (FG, 3PT, FT, rebounds, assists, steals, blocks, turnovers), quarter-by-quarter scores, attendance, and broadcast info.
+- **draft_history.csv / draft_combine_stats.csv**: Draft picks and pre-draft physical/athletic measurements (height, weight, wingspan, vertical leap, sprint, bench press).
+- **play_by_play.csv**: ~13.6M play-level event log with timestamps, player actions, and running score.
+- **officials.csv / inactive_players.csv**: Referee assignments and inactive player lists per game.
+
+### athlete_events.csv + noc_regions.csv
+120 years of Olympic history (1896–2016). ~271K athlete-event records across 66 sports, 230 NOCs (National Olympic Committees).
+
+- **athlete_events.csv**: ID, Name, Sex, Age, Height, Weight, Team, NOC, Games, Year, Season (Summer/Winter), City, Sport, Event, Medal (Gold/Silver/Bronze/NA).
+- **noc_regions.csv**: NOC code → region (country name) mapping with notes for historical/dissolved NOCs.
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: Country / Nationality (key bridge across all three sources)
+- European Soccer: Country.name (11 European nations).
+- NBA: common_player_info.country (~40 nations, predominantly USA).
+- Olympic: NOC → noc_regions.region (230 countries). Olympic covers all countries in both Soccer and NBA.
+- Matching requires name normalization (e.g., "USA" vs "United States"; NOC code "GBR" → "UK" vs Soccer "England/Scotland").
+
+### Connection 2: Sport Overlap (Basketball & Football)
+- Olympic athlete_events where Sport="Basketball" contains Olympic basketball players who may also appear in NBA (matchable via Name, Year, Team/country).
+- Olympic athlete_events where Sport="Football" contains Olympic football players who may overlap with European Soccer Player table (matchable via player_name, birthday, height/weight).
+
+### Connection 3: Physical Attributes (Height / Weight)
+- European Soccer Player: height (cm), weight (kg).
+- NBA: common_player_info.height/weight; draft_combine_stats has detailed measurements (wingspan, vertical leap, sprint).
+- Olympic: Height (cm), Weight (kg).
+- Enables cross-sport athlete physique comparison (e.g., basketball vs football vs swimming athletes).
+
+### Connection 4: Time / Year
+- European Soccer Match: date (2008–2016), season.
+- NBA game: game_date, season_id (1940s–present).
+- Olympic: Year (1896–2016), Games.
+- Overlapping period (~2008–2016) allows temporal cross-sport analysis.
+
+### Connection 5: City / Venue (weak link)
+- Olympic: City (host city of Games).
+- NBA: team_details.city, team_details.arena.
+- European Soccer: Country-level only (no city in Match table).
+- Useful for analyzing host-city effects or geographic clustering.
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+### Within European Soccer
+1. **Player Rating Prediction**: Join Player_Attributes with Player biographical data; predict overall_rating from age, height, weight, and individual skill attributes.
+2. **Match Outcome & Betting Analysis**: Analyze home/away win rates by league; compare bookmaker odds accuracy across different betting providers.
+3. **Team Tactical Profiling**: Cluster teams by Team_Attributes (build-up speed, passing, defensive pressure); correlate tactical style with match results.
+
+### Within NBA
+4. **Draft Combine → Career Performance**: Join draft_combine_stats physical measurements with career game stats to predict NBA success from pre-draft athleticism.
+5. **Game Flow Analysis**: Use play_by_play event sequences and line_score quarter data to identify comeback patterns, clutch performance, and momentum shifts.
+
+### Within Olympic
+6. **Medal Prediction by Country**: Aggregate medals by NOC and Year; analyze trends and predict future medal counts using historical patterns and country GDP (via noc_regions).
+7. **Athlete Physical Profiles by Sport**: Compare Height/Weight distributions across the 66 Olympic sports to characterize body-type requirements.
+
+### Cross-Source (2+ sources)
+8. **Cross-Sport Physique Comparison**: Merge height/weight data from all three sources; compare body profiles of NBA players, European footballers, and Olympic athletes across sports (e.g., do NBA players differ significantly from Olympic basketball players?).
+9. **Country Sports Strength**: Count Olympic medals by country, European Soccer league rankings by country, and NBA player origins by country to build composite national sports power indices.
+10. **Basketball Crossover**: Match Olympic Basketball athletes with NBA players by name/country/year to analyze whether Olympic participation correlates with NBA season performance.
+11. **Football Crossover**: Match Olympic Football athletes with European Soccer Player table to find dual-competition players; compare FIFA skill ratings of Olympic vs non-Olympic footballers.
+12. **Temporal Popularity Trends**: Track participation counts (Olympic athletes by sport, NBA games per season, Soccer matches per season) over overlapping years to detect cross-sport growth or decline patterns.

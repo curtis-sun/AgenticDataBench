@@ -1,0 +1,77 @@
+# Entertainment Domain — Cross-Source Data Connection Guide
+
+## Data Source Overview
+
+### spotify_tracks.csv
+~114,000 Spotify tracks across 114 genres. Each row has audio features (danceability, energy, loudness, speechiness, acousticness, instrumentalness, liveness, valence, tempo) plus metadata (track_id, artists, album_name, track_name, popularity, track_genre, explicit).
+
+### top2017.csv / top2018.csv / top50_2020.csv
+Year-end top songs for 2017 (~100), 2018 (~100), and 2020 (50). Share audio feature columns with spotify_tracks but use slightly different naming: top2017/2018 have "id"/"name"/"artists", top50_2020 has "track_id"/"track_name"/"artist"/"genre"/"album". Harmonization needed before merging.
+
+### The Movies Dataset/
+TMDb + GroupLens multi-file movie database. Internal join key: TMDb "id" across movies_metadata/credits/keywords; GroupLens "movieId" in ratings; links.csv bridges tmdbId↔movieId↔imdbId.
+
+- **movies_metadata.csv**: ~45K movies with title, genres (JSON), release_date, budget, revenue, runtime, popularity, vote_average, vote_count, overview, production_companies (JSON), production_countries (JSON).
+- **credits.csv**: cast/crew per movie (JSON lists requiring parsing).
+- **keywords.csv**: plot keywords per movie (JSON list).
+- **ratings.csv / ratings_small.csv**: User-movie ratings (0.5–5.0). ratings.csv has ~26M rows; ratings_small.csv (~100K) is a manageable subset.
+- **links.csv / links_small.csv**: ID mapping between GroupLens movieId, IMDb imdbId, and TMDb tmdbId.
+
+### vgsales.csv
+~16,600 video games from VGChartz. Columns: Name, Platform, Year, Genre, Publisher, and regional sales (NA_Sales, EU_Sales, JP_Sales, Other_Sales, Global_Sales in millions). Year has some missing values.
+
+### netflix_titles.csv
+~8,800 Netflix titles (movies and TV shows). Columns: type ("Movie"/"TV Show"), title, director, cast, country, date_added, release_year, rating (content rating like PG-13/TV-MA, NOT quality score), duration, listed_in (genres, comma-separated), description. Multi-valued columns (cast, country, listed_in) need splitting.
+
+### books.csv
+~11,100 Goodreads books. Columns: title, authors (slash-separated), average_rating (1–5), language_code, num_pages, ratings_count, text_reviews_count, publication_date, publisher.
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: Genre / Category (semantic match)
+- spotify_tracks "track_genre", movies_metadata "genres" (JSON), vgsales "Genre", netflix_titles "listed_in", top50_2020 "genre".
+- Taxonomies differ across media — requires semantic mapping (e.g., movie "Action" ≈ game "Action"; music genres have no direct film equivalent).
+
+### Connection 2: Title / Name (fuzzy match for adaptations/franchises)
+- movies_metadata "title", netflix_titles "title", books "title", vgsales "Name".
+- Links book→movie adaptations, movie→game tie-ins, TMDb↔Netflix overlaps. Requires fuzzy string matching.
+
+### Connection 3: Year / Time (direct match, ~1980–2020 overlap)
+- movies_metadata "release_date", vgsales "Year", netflix_titles "release_year"/"date_added", books "publication_date", top songs implicitly tagged (2017/2018/2020).
+
+### Connection 4: Rating / Popularity (scale normalization needed)
+- movies_metadata "vote_average" (1–10) + ratings.csv (0.5–5.0), spotify_tracks "popularity" (0–100), vgsales "Global_Sales" (millions, as popularity proxy), books "average_rating" (1–5).
+- Note: netflix_titles "rating" is content rating (PG-13, TV-MA), NOT a quality score.
+
+### Connection 5: Creator / Person (fuzzy match)
+- spotify_tracks "artists", credits.csv cast/crew names, netflix_titles "director"/"cast", books "authors".
+- Some creators span media (actors who are musicians, authors whose books become films).
+
+### Connection 6: Country / Region
+- netflix_titles "country", movies_metadata "production_countries" (JSON), vgsales regional sales (NA/EU/JP/Other), books "language_code" as region proxy.
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+### Within Music
+1. **Hit Song Evolution**: Compare audio feature distributions across top2017, top2018, top50_2020 to detect year-over-year shifts in hit characteristics; use spotify_tracks as baseline.
+2. **Genre Audio Fingerprinting**: Cluster spotify_tracks by audio features; analyze which genres are acoustically distinct vs. overlapping.
+
+### Within Movies
+3. **Revenue Prediction**: Parse JSON columns from movies_metadata, join with credits.csv for director/cast features, build regression predicting revenue from budget, genre, cast, and timing.
+4. **Collaborative Filtering**: Build user-user or item-item recommendation from ratings_small.csv; enrich with movies_metadata content features.
+
+### Cross-Media (2+ sources)
+5. **Cross-Media Genre Trends**: Map genres to common taxonomy across movies, games, and Netflix; compare popularity rankings by year to detect synchronized trends.
+6. **Book-to-Movie Adaptation**: Fuzzy-match book titles to movie/Netflix titles; compare book average_rating with movie vote_average (after normalization).
+7. **Regional Taste Profiling**: Compare Japan game preferences (JP_Sales by Genre) with Japan-origin Netflix content and Japanese-language books for cross-media regional patterns.
+8. **Publisher/Studio Market Concentration**: Compare top publishers in vgsales (by sales), production companies in movies (by revenue), and book publishers (by ratings_count); compute market concentration metrics.
+9. **Content Rating vs. Reception**: Match netflix_titles to movies_metadata by title+year; analyze whether mature-rated content receives systematically different audience scores.
+10. **Multi-Media Temporal Trends**: Count releases per year across movies, games, Netflix additions, and books; identify cross-media boom/bust periods.
+
+### 3+ Sources
+11. **Entertainment Franchise Lifecycle**: Trace major franchises (Harry Potter, Star Wars, Marvel) across books, movies, games, and streaming via title matching; compare cross-media popularity metrics.
+12. **Creator Crossover Analysis**: Find individuals appearing across music (artists), movies (cast/crew), Netflix (director/cast), and books (authors); analyze whether cross-media presence correlates with higher popularity.

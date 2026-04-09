@@ -1,0 +1,260 @@
+# Energy Domain — Cross-Folder Data Connection Guide
+
+## Data Source Overview
+
+### Steel_industry_data.csv
+Single CSV with 35,040 records of a steel industry plant's energy consumption at 15-minute intervals throughout 2018. Contains:
+
+- **date**: Timestamp in DD/MM/YYYY HH:MM format (note: the column has a BOM prefix `\ufeff`).
+- **Usage_kWh**: Energy consumption in kilowatt-hours per 15-minute interval.
+- **Lagging_Current_Reactive.Power_kVarh**: Lagging current reactive power (kVArh).
+- **Leading_Current_Reactive_Power_kVarh**: Leading current reactive power (kVArh).
+- **CO2(tCO2)**: CO₂ emissions in tonnes (ppm — parts per million measurement).
+- **Lagging_Current_Power_Factor**: Lagging current power factor (%).
+- **Leading_Current_Power_Factor**: Leading current power factor (%).
+- **NSM**: Number of seconds from midnight.
+- **WeekStatus**: "Weekday" or "Weekend".
+- **Day_of_week**: Day name (Monday–Sunday).
+- **Load_Type**: Load classification — "Light_Load", "Medium_Load", or "Maximum_Load".
+
+This dataset has no geographic identifiers. It represents a single industrial facility and is best suited for time-series analysis, load pattern recognition, and industrial energy efficiency studies.
+
+### global-data-on-sustainable-energy.csv
+CSV with 3,649 records covering 176 countries/entities from 2000–2020. Focuses on energy access, renewable energy, and socio-economic indicators. Contains:
+
+- **Entity**: Country or region name (e.g., "Afghanistan", "United States").
+- **Year**: Year of observation (2000–2020).
+- **Access to electricity (% of population)**: Percentage of population with access to electricity.
+- **Access to clean fuels for cooking**: Percentage of population with access to clean cooking fuels.
+- **Renewable-electricity-generating-capacity-per-capita**: Renewable electricity generating capacity per capita.
+- **Financial flows to developing countries (US $)**: Financial flows for clean energy to developing countries.
+- **Renewable energy share in the total final energy consumption (%)**: Renewable energy as share of total final energy consumption.
+- **Electricity from fossil fuels (TWh)**: Electricity generation from fossil fuels in terawatt-hours.
+- **Electricity from nuclear (TWh)**: Electricity generation from nuclear in terawatt-hours.
+- **Electricity from renewables (TWh)**: Electricity generation from renewables in terawatt-hours.
+- **Low-carbon electricity (% electricity)**: Low-carbon sources as percentage of total electricity.
+- **Primary energy consumption per capita (kWh/person)**: Primary energy consumption per person.
+- **Energy intensity level of primary energy (MJ/$2017 PPP GDP)**: Energy intensity measured against GDP.
+- **Value_co2_emissions_kt_by_country**: CO₂ emissions in kilotonnes.
+- **Renewables (% equivalent primary energy)**: Renewables as share of primary energy.
+- **gdp_growth**: GDP growth rate (%).
+- **gdp_per_capita**: GDP per capita.
+- **Density\n(P/Km2)**: Population density (note: column name contains a literal newline character).
+- **Land Area(Km2)**: Land area in square kilometers.
+- **Latitude, Longitude**: Geographic coordinates of the country centroid.
+
+### owid-co2-data.csv
+CSV with 50,411 records covering 254 countries/entities from 1750–2024 (79 columns). Sourced from Our World in Data / Global Carbon Budget. Focuses on CO₂ emissions broken down by fuel type, sector, and cumulative totals. Many early-year rows are sparse (data availability improves significantly post-1900). Key column groups:
+
+**Identifiers:**
+- **country**: Country or region name (e.g., "Afghanistan", "United States").
+- **year**: Year of observation (1750–2024).
+- **iso_code**: ISO 3166-1 alpha-3 country code (e.g., "AFG", "USA").
+- **population**: Population count.
+- **gdp**: GDP in 2011 international-$ (PPP).
+
+**Annual CO₂ emissions by fuel type (all in million tonnes):**
+- **co2**: Total CO₂ excluding land-use change.
+- **coal_co2**: CO₂ from coal.
+- **oil_co2**: CO₂ from oil.
+- **gas_co2**: CO₂ from gas.
+- **cement_co2**: CO₂ from cement production.
+- **flaring_co2**: CO₂ from gas flaring.
+- **other_industry_co2**: CO₂ from other industrial processes.
+- **land_use_change_co2**: CO₂ from land-use change.
+- **co2_including_luc**: Total CO₂ including land-use change.
+
+**Per-capita and intensity metrics:**
+- **co2_per_capita**: CO₂ per person (tonnes/person).
+- **co2_per_gdp**: CO₂ per dollar of GDP (kg/$).
+- **co2_per_unit_energy**: CO₂ per kWh of primary energy (kg/kWh).
+- **energy_per_capita**: Primary energy consumption per capita.
+- **energy_per_gdp**: Primary energy per GDP.
+- Corresponding per-capita columns exist for each fuel type (e.g., coal_co2_per_capita, oil_co2_per_capita).
+
+**Consumption-based emissions:**
+- **consumption_co2**: Consumption-based CO₂ (adjusts for trade).
+- **consumption_co2_per_capita, consumption_co2_per_gdp**: Per-capita and per-GDP.
+- **trade_co2**: Net CO₂ embedded in trade.
+- **trade_co2_share**: Trade CO₂ as percentage of production emissions.
+
+**Cumulative emissions (all in million tonnes, since first available year):**
+- **cumulative_co2, cumulative_co2_including_luc**: Total cumulative.
+- **cumulative_coal_co2, cumulative_oil_co2, cumulative_gas_co2, cumulative_cement_co2, cumulative_flaring_co2, cumulative_luc_co2, cumulative_other_co2**: By fuel type.
+
+**Global share columns (all in %):**
+- **share_global_co2, share_global_coal_co2, share_global_oil_co2, share_global_gas_co2**, etc.: Country's share of global annual emissions by fuel type.
+- **share_global_cumulative_co2, share_global_cumulative_coal_co2**, etc.: Country's share of global cumulative emissions.
+
+**Greenhouse gas and temperature change:**
+- **total_ghg**: Total GHG emissions including land use (million tonnes CO₂-equivalent).
+- **total_ghg_excluding_lucf**: Total GHG from fossil fuels and industry.
+- **ghg_per_capita, ghg_excluding_lucf_per_capita**: Per-capita GHG.
+- **methane, methane_per_capita**: Methane emissions.
+- **nitrous_oxide, nitrous_oxide_per_capita**: Nitrous oxide emissions.
+- **temperature_change_from_co2, temperature_change_from_ch4, temperature_change_from_n2o, temperature_change_from_ghg**: Contribution to global mean surface temperature change (°C).
+- **share_of_temperature_change_from_ghg**: Share of global warming contribution (%).
+
+**Energy:**
+- **primary_energy_consumption**: Primary energy consumption in terawatt-hours (TWh).
+
+### U.S._Electricity_Prices.csv
+CSV with 85,870 records of monthly U.S. electricity prices by state and sector, from 2001–2024 (EIA Form 861 data). Contains:
+
+- **year**: Year (2001–2024).
+- **month**: Month (1–12).
+- **stateDescription**: Full state name (e.g., "Alabama", "California"). Also includes census region aggregates ("East North Central", "Middle Atlantic", "Mountain", "New England", "Pacific Contiguous", "Pacific Noncontiguous", "South Atlantic", "West North Central", "West South Central") and "U.S. Total".
+- **sectorName**: Consuming sector — "residential", "commercial", "industrial", "transportation", "other", or "all sectors".
+- **customers**: Number of customers.
+- **price**: Average retail price of electricity (cents/kWh).
+- **revenue**: Revenue (million dollars).
+- **sales**: Electricity sales (million kWh).
+
+Note: stateDescription uses full state names. To join with US_Energy_Generation_2001-2022.csv (which uses 2-letter abbreviations), a state name-to-abbreviation mapping is required.
+
+### US_Energy_Generation_2001-2022.csv
+CSV with 496,774 records of monthly U.S. electricity generation by state, energy source, and producer type, from 2001–2022 (EIA data). Contains:
+
+- **(Unnamed first column)**: Row index from original pandas export (0, 1, 2...) — should be ignored.
+- **YEAR**: Year (2001–2022).
+- **MONTH**: Month (1–12).
+- **STATE**: Two-letter state abbreviation (e.g., "AK", "CA", "TX"). Also includes "US-TOTAL" for national aggregates.
+- **TYPE OF PRODUCER**: Producer category — "Total Electric Power Industry" and sub-categories.
+- **ENERGY SOURCE**: Energy source — "Coal", "Natural Gas", "Nuclear", "Petroleum", "Hydroelectric Conventional", "Wind", "Solar Thermal and Photovoltaic", "Geothermal", "Wood and Wood Derived Fuels", "Other Biomass", "Other Gases", "Other", "Pumped Storage", "Total".
+- **GENERATION (Megawatthours)**: Electricity generation in MWh.
+
+Note: STATE uses 2-letter abbreviations. To join with U.S._Electricity_Prices.csv or Google Project Sunroof files (which use full state names), a standard US state abbreviation-to-name mapping is required. "US-TOTAL" corresponds to "U.S. Total" in the prices dataset.
+
+### Google Project Sunroof/
+Four CSV files containing Google's Project Sunroof data on solar energy potential for buildings across the United States, at different geographic granularities. All four files share the same schema. Data was collected circa 2017.
+
+- **project-sunroof-state-09082017.csv**: State-level aggregates (52 rows).
+- **project-sunroof-county-09082017.csv**: County-level (910 rows).
+- **project-sunroof-city-09082017.csv**: City-level (7,930 rows).
+- **project-sunroof-postal_code-09082017.csv**: Postal code / ZIP code level (10,621 rows).
+
+Shared columns across all four files:
+
+- **region_name**: Name of the geographic region (state name, county name, city name, or ZIP code).
+- **state_name**: Full name of the state containing the region (e.g., "Alabama", "California"). Contains "NULL" for a small number of unmatched records.
+- **lat_max, lat_min, lng_max, lng_min**: Bounding box coordinates of the region.
+- **lat_avg, lng_avg**: Average latitude and longitude of the region.
+- **yearly_sunlight_kwh_kw_threshold_avg**: Average annual sunlight threshold — 75% of the optimum sunlight in the county (kWh/kW).
+- **count_qualified**: Number of buildings in Google Maps that are suitable for solar.
+- **percent_covered**: Percentage of buildings in Google Maps covered by Project Sunroof.
+- **percent_qualified**: Percentage of covered buildings that are suitable for solar.
+- **number_of_panels_total**: Total number of solar panels potential for all roof space (assuming 1.650m × 0.992m panels).
+- **number_of_panels_n / _s / _e / _w / _f**: Panel potential by roof orientation — north, south, east, west, and flat.
+- **number_of_panels_median**: Number of panels that fit on the median building's roof.
+- **yearly_sunlight_kwh_total**: Total solar energy generation potential for all roof space in the region (kWh).
+- **yearly_sunlight_kwh_n / _s / _e / _w / _f**: Solar energy potential by roof orientation (kWh).
+- **yearly_sunlight_kwh_median**: Solar energy potential for the median building's roof (kWh/kW/yr, in DC terms).
+- **kw_total**: Total kilowatt capacity of solar potential for all roof types (assuming 250W per panel).
+- **kw_median**: Kilowatt capacity for the median building.
+- **carbon_offset_metric_tons**: Potential CO₂ abatement from the solar capacity, calculated using eGRID subregion CO₂ equivalent non-baseload output emission rates.
+- **existing_installs_count**: Number of buildings estimated to already have a solar installation at time of data collection.
+- **install_size_kw_buckets_json**: JSON array of (lower_bound_kW, building_count) tuples for various installation size buckets.
+
+Note: state_name uses full state names, matching U.S._Electricity_Prices.csv's stateDescription. The state-level file's region_name also equals the state name. To join with US_Energy_Generation_2001-2022.csv, a state name-to-abbreviation mapping is needed.
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: Country / Entity Name (direct match between global datasets)
+- global-data-on-sustainable-energy.csv: **Entity** column (176 countries).
+- owid-co2-data.csv: **country** column (254 countries).
+- Both use English country names (e.g., "United States", "China", "India"). Most names match directly; minor spelling differences may exist for a few entities. owid-co2-data also provides **iso_code** (ISO 3166-1 alpha-3) for standardized matching.
+- Joining on (Entity/country, Year/year) enables combined analysis of energy access + renewable capacity (from global-data) with detailed CO₂ breakdowns by fuel type (from owid).
+
+### Connection 2: U.S. State (requires abbreviation mapping across US datasets)
+- U.S._Electricity_Prices.csv: **stateDescription** — full state names (e.g., "Alabama"). Also includes census region aggregates and "U.S. Total".
+- US_Energy_Generation_2001-2022.csv: **STATE** — two-letter abbreviations (e.g., "AL"). Includes "US-TOTAL".
+- Google Project Sunroof files: **state_name** — full state names (e.g., "Alabama"). Includes some "NULL" entries.
+- Joining requires a standard US state abbreviation-to-full-name mapping (e.g., "AL" ↔ "Alabama", "CA" ↔ "California"). All three sources cover the 50 US states plus DC. Non-state aggregates ("U.S. Total" / "US-TOTAL", census regions) should be handled separately.
+
+### Connection 3: Year / Time Dimension
+- global-data-on-sustainable-energy.csv: **Year** (2000–2020, annual).
+- owid-co2-data.csv: **year** (1750–2024, annual; most data post-1900).
+- U.S._Electricity_Prices.csv: **year** + **month** (2001–2024, monthly).
+- US_Energy_Generation_2001-2022.csv: **YEAR** + **MONTH** (2001–2022, monthly).
+- Steel_industry_data.csv: **date** (2018 only, 15-minute intervals).
+- Overlapping annual range across most datasets: 2001–2020. Monthly US datasets can be aggregated to annual for cross-source joins. Steel data is limited to 2018.
+
+### Connection 4: CO₂ / Carbon Emissions (semantic match across multiple datasets)
+- Steel_industry_data.csv: **CO2(tCO2)** — industrial CO₂ emissions at 15-minute intervals (ppm-level measurement).
+- global-data-on-sustainable-energy.csv: **Value_co2_emissions_kt_by_country** — annual country-level CO₂ in kilotonnes.
+- owid-co2-data.csv: **co2** (total), **coal_co2**, **oil_co2**, **gas_co2**, **cement_co2**, etc. — annual country-level CO₂ by fuel type in million tonnes. Also **co2_per_capita**, **co2_per_gdp**, **co2_per_unit_energy**.
+- Google Project Sunroof: **carbon_offset_metric_tons** — potential CO₂ abatement from solar capacity at regional level.
+- These measure related concepts at very different granularities (facility vs. country, snapshot vs. time-series). Cross-source questions should focus on comparison/contextualization rather than direct numerical joins — e.g., comparing a steel plant's annual CO₂ to its country's total emissions, or comparing solar carbon offsets to state-level fossil fuel emissions.
+
+### Connection 5: Energy Quantity Metrics (semantic parallel across datasets)
+- Steel_industry_data.csv: **Usage_kWh** — energy consumption in kWh (15-min intervals).
+- global-data-on-sustainable-energy.csv: **Primary energy consumption per capita (kWh/person)**, **Electricity from fossil fuels/nuclear/renewables (TWh)**.
+- owid-co2-data.csv: **primary_energy_consumption** (TWh), **energy_per_capita**, **energy_per_gdp**.
+- U.S._Electricity_Prices.csv: **sales** (million kWh) — electricity sales by state and sector.
+- US_Energy_Generation_2001-2022.csv: **GENERATION (Megawatthours)** — electricity generation by state and source.
+- Google Project Sunroof: **yearly_sunlight_kwh_total**, **kw_total** — solar energy potential.
+- All datasets measure energy in kWh-family units (kWh, MWh, TWh) but at vastly different scales. Cross-source analysis can compare generation capacity vs. consumption, solar potential vs. actual generation, or contextualize industrial consumption within national totals.
+
+### Connection 6: U.S. State + Year (direct join between US datasets)
+- U.S._Electricity_Prices.csv: **(stateDescription, year, month)**.
+- US_Energy_Generation_2001-2022.csv: **(STATE, YEAR, MONTH)** — requires abbreviation-to-name mapping.
+- Overlapping period: 2001–2022 (monthly). This enables direct analysis of electricity price vs. generation mix by state — e.g., do states with more renewable generation have lower electricity prices?
+
+### Connection 7: U.S. State — Solar Potential vs. Actual Energy (Sunroof ↔ US datasets)
+- Google Project Sunroof: **state_name** with solar potential metrics (2017 snapshot).
+- US_Energy_Generation_2001-2022.csv: **STATE** with actual generation by source including "Solar Thermal and Photovoltaic" (can filter to 2017 for temporal alignment).
+- U.S._Electricity_Prices.csv: **stateDescription** with electricity prices (can filter to 2017).
+- Enables analysis of solar potential vs. actual solar adoption, and economic feasibility (solar potential × electricity price = potential savings).
+
+### Connection 8: Global ↔ U.S. Bridge (aggregate US state data to national level)
+- US state-level datasets (Electricity Prices, Energy Generation, Sunroof) can be aggregated to the national level (using "U.S. Total" / "US-TOTAL" rows, or by summing state values).
+- The aggregated US figures can then be compared with the "United States" entity in global-data-on-sustainable-energy.csv and owid-co2-data.csv.
+- This enables questions like: "Compare the US renewable energy share from the global dataset with the actual solar + wind generation share computed from the state-level generation data."
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+### Patterns involving Global Datasets (global-data + owid-co2-data)
+
+1. **Energy Access vs. Carbon Emissions**: Join global-data (Entity, Year) with owid-co2-data (country, year) to analyze whether countries with higher electricity access tend to have higher CO₂ per capita, and how renewable energy share moderates this relationship.
+
+2. **Renewable Transition and Decarbonization**: Compare Renewable energy share (global-data) with co2_per_unit_energy (owid) over time to identify countries where renewable adoption has successfully reduced carbon intensity.
+
+3. **GDP, Energy Intensity, and Emissions**: Combine gdp_per_capita and Energy intensity (global-data) with co2_per_gdp and consumption_co2 (owid) to examine the Environmental Kuznets Curve hypothesis — whether CO₂ eventually decreases as GDP grows.
+
+4. **Historical Emissions Decomposition**: Use owid-co2-data alone to decompose a country's total CO₂ into fuel-type contributions (coal, oil, gas, cement, flaring) and analyze how the fuel mix has shifted over decades.
+
+5. **Temperature Change Attribution**: Use owid's temperature_change_from_co2/ch4/n2o/ghg columns to analyze which countries and which greenhouse gases contribute most to observed global warming.
+
+### Patterns involving U.S. Datasets (Electricity Prices + Energy Generation + Sunroof)
+
+6. **Electricity Price vs. Generation Mix**: Join Electricity Prices (stateDescription, year, month) with Energy Generation (STATE, YEAR, MONTH) — after abbreviation mapping — to analyze whether states with higher renewable generation shares have different electricity prices.
+
+7. **Solar Potential vs. Actual Adoption**: Join Sunroof state-level data (state_name) with Energy Generation (STATE, filtered to Solar source and 2017) to compare theoretical solar potential (kw_total, yearly_sunlight_kwh_total) with actual solar generation (GENERATION in MWh).
+
+8. **Solar Economic Feasibility by State**: Join Sunroof (state_name) with Electricity Prices (stateDescription, filtered to residential sector and 2017) to estimate the economic value of solar potential per state (yearly_sunlight_kwh_total × price). States with both high solar potential and high electricity prices represent the best solar investment opportunities.
+
+9. **Energy Transition Trends**: Use Energy Generation to compute each state's renewable share over 2001–2022, then join with Electricity Prices to examine whether states that increased renewable generation experienced different price trajectories.
+
+10. **Geographic Solar Analysis**: Use Sunroof's multi-granularity data (state → county → city → postal_code) to analyze how solar potential varies geographically — e.g., identify the top counties within each state, or compute the within-state variance of solar potential using city-level data.
+
+### Patterns involving Steel Industry Data
+
+11. **Industrial Load Pattern Analysis**: Analyze Steel_industry_data's energy consumption patterns by Load_Type, WeekStatus, and Day_of_week. Identify peak usage periods, seasonal trends, and the relationship between load type and CO₂ emissions / power factor.
+
+12. **Industrial Power Factor Optimization**: Examine the relationship between Lagging/Leading_Current_Power_Factor and Usage_kWh/CO2 in the steel data to identify operational conditions that maximize energy efficiency.
+
+13. **Industrial vs. National Context**: Compare the steel plant's annual total energy consumption (sum of Usage_kWh for 2018) with the "United States" industrial electricity sales from U.S._Electricity_Prices.csv (sectorName = "industrial", year = 2018) to contextualize a single facility's footprint.
+
+### Patterns involving 3+ Sources
+
+14. **Global-to-Local Energy Pipeline**: (a) Use owid-co2-data to identify the United States' CO₂ from coal/gas/oil, (b) use US_Energy_Generation to verify the actual fossil fuel generation mix by state, (c) use Sunroof to estimate how much of that fossil generation could theoretically be replaced by rooftop solar, (d) use Electricity Prices to estimate the economic impact of such a transition.
+
+15. **Renewable Potential Gap Analysis**: (a) From global-data, get the US renewable energy share, (b) from Energy Generation, compute actual renewable generation by state, (c) from Sunroof, estimate untapped solar potential by state, (d) quantify the gap between current renewable adoption and theoretical solar-only potential.
+
+16. **Carbon Offset Valuation**: (a) From Sunroof, get carbon_offset_metric_tons by state, (b) from Energy Generation, get actual fossil fuel generation and estimate its CO₂, (c) from owid-co2-data, get the US national CO₂ — then compute what fraction of US emissions could be offset by full rooftop solar deployment.
+
+17. **Cross-Scale Price-Emission Analysis**: (a) From Electricity Prices, get state-level industrial electricity prices, (b) from Energy Generation, compute state-level carbon intensity (fossil generation / total generation), (c) from owid-co2-data, get US co2_per_unit_energy — then analyze whether states with higher carbon intensity have different electricity prices, and compare state-level patterns with the national aggregate.

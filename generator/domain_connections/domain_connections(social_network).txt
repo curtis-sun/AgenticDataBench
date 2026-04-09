@@ -1,0 +1,79 @@
+# Social Network Domain — Cross-File Data Connection Guide
+
+## Data Source Overview
+
+### Twitter Platform — User & Tweet Files
+
+- **gender-classifier-DFE-791531.csv**: ~5.4K rows. CrowdFlower gender classification of Twitter users. Key columns: gender, name, description, text, tweet_id, retweet_count, tweet_location, user_timezone.
+- **Twitter_US_Airline_Sentiment.sqlite**: ~14.5K rows (table: Tweets). Same CrowdFlower structure. Key columns: tweet_id, airline_sentiment, negativereason, airline, name, text, retweet_count, tweet_location, user_timezone.
+- **twitter_dataset.csv**: ~25.8K rows. General tweets. Key columns: Tweet_ID, Username, Text, Retweets, Likes, Timestamp.
+- **twitter_friends.csv**: ~40K rows. Social graph data. Key columns: id, screenName, followersCount, friendsCount, lang, tweetId, tags, friends (JSON array of friend IDs).
+- **bot_detection_data.csv**: ~50K rows. Bot vs. human labeled accounts. Key columns: User ID, Username, Tweet, Retweet Count, Mention Count, Follower Count, Verified, Bot Label, Location, Created At, Hashtags.
+
+### Twitter Platform — Text Classification
+
+- **Hate_Speech_and_Offensive_Language.csv**: ~27K rows. Annotated tweets with crowd-sourced labels. Key columns: hate_speech, offensive_language, neither (vote counts), class (0=hate, 1=offensive, 2=neither), tweet.
+
+### Cross-Platform — Video & Influencer
+
+- **Trending_YouTube_Video.csv**: ~41K rows. US trending video statistics. Key columns: video_id, trending_date, title, channel_title, category_id, publish_time, tags, views, likes, dislikes, comment_count, description.
+- **top_insta_influencers_data.csv**: ~200 rows. Top Instagram influencer profiles. Key columns: rank, channel_info, influence_score, posts, followers, avg_likes, 60_day_eng_rate, new_post_avg_like, total_likes, country.
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: User Identity (direct join across Twitter files)
+- gender-classifier `name` ↔ Airline_Sentiment `name` ↔ twitter_dataset `Username` ↔ twitter_friends `screenName` ↔ bot_detection `Username`
+- These are display names / screen names; matching requires case-insensitive or fuzzy comparison.
+
+### Connection 2: Tweet Text (NLP bridge across all sources)
+- All Twitter files contain tweet text: gender-classifier `text`, Airline_Sentiment `text`, twitter_dataset `Text`, bot_detection `Tweet`, Hate_Speech `tweet`.
+- YouTube `description`/`title` and Instagram `channel_info` extend text analysis cross-platform.
+- Enables: sentiment comparison, topic modeling, vocabulary overlap, text classification transfer.
+
+### Connection 3: Engagement Metrics (cross-platform comparison)
+- Twitter: `retweet_count`/`Retweets`, `Likes`, `Follower Count`, `followersCount`/`friendsCount`.
+- YouTube: `views`, `likes`, `dislikes`, `comment_count`.
+- Instagram: `followers`, `avg_likes`, `total_likes`, `posts`.
+- Enables: normalized engagement rate comparison across platforms, influence modeling.
+
+### Connection 4: Tags & Topics (semantic overlap)
+- twitter_friends `tags` ↔ bot_detection `Hashtags` ↔ YouTube `tags`
+- All are topic/hashtag arrays. Matching requires JSON parsing and string normalization.
+
+### Connection 5: Geography / Location
+- gender-classifier `tweet_location`/`user_timezone` ↔ Airline_Sentiment `tweet_location`/`user_timezone` ↔ bot_detection `Location` ↔ Instagram `country`.
+- Heterogeneous formats (city names, timezone strings, country names); fuzzy matching or geocoding needed.
+
+### Connection 6: Time Dimension
+- gender-classifier `tweet_created` ↔ Airline_Sentiment `tweet_created` ↔ twitter_dataset `Timestamp` ↔ bot_detection `Created At` ↔ YouTube `publish_time`/`trending_date`.
+- Enables: temporal trend analysis, cross-platform activity patterns, time-series comparisons.
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+### Within Twitter Platform
+
+1. **Bot Behavior Profiling**: Join bot_detection (Bot Label, Follower Count, Retweet Count) with twitter_friends (followersCount, friendsCount, friends list) on Username/screenName to analyze follower/friend ratio anomalies in bot accounts.
+
+2. **Gender × Sentiment Analysis**: Join gender-classifier (gender) with Airline_Sentiment (airline_sentiment) on name to examine gender differences in airline complaint patterns and sentiment expression.
+
+3. **Hate Speech & Bot Correlation**: Compare text features in Hate_Speech (class labels) with bot_detection (Bot Label) via tweet text similarity or shared vocabulary to investigate whether bot accounts disproportionately spread hate speech.
+
+4. **Social Graph Influence**: Combine twitter_friends (friends list, followersCount) with twitter_dataset (Retweets, Likes) on screenName/Username to model how network centrality relates to engagement.
+
+### Cross-Platform
+
+5. **Engagement Rate Benchmarking**: Normalize engagement metrics across Twitter (retweet/like per follower), YouTube (like/view ratio, comment/view ratio), and Instagram (avg_likes/followers) to compare platform-level engagement dynamics.
+
+6. **Cross-Platform Topic Trend**: Extract topics from YouTube `tags` and Twitter `Hashtags`/`tags`, align by time window (YouTube `trending_date` vs Twitter timestamps), and identify which trending topics propagate across platforms.
+
+7. **Influencer Reach Comparison**: Compare Instagram influencer `followers`/`avg_likes` distribution with Twitter `followersCount` distribution to analyze platform-specific power-law characteristics of social influence.
+
+### Multi-Source (3+ files)
+
+8. **Comprehensive User Credibility Model**: Combine bot_detection (Bot Label, Verified), gender-classifier (gender, description), twitter_friends (followersCount, friendsCount, friends list), and Hate_Speech (class) to build a multi-factor user credibility scoring model using both profile features and content signals.
+
+9. **Geographic Social Media Landscape**: Join location-bearing files (gender-classifier, Airline_Sentiment, bot_detection, Instagram influencers) by geography to create a regional profile of social media behavior — bot prevalence, sentiment polarity, influencer density, and platform preference by region.

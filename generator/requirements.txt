@@ -1,0 +1,26 @@
+# Data manipulation
+pandas
+numpy
+scipy
+networkx
+
+# File format support
+openpyxl
+pyarrow
+xarray
+fiona
+pyproj
+simpledbf
+genson
+beautifulsoup4
+
+# Machine learning
+scikit-learn
+
+# LLM / AI APIs
+openai
+dashscope
+
+# Utilities
+pyyaml
+python-dotenv

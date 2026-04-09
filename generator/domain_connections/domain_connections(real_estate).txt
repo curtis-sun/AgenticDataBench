@@ -1,0 +1,58 @@
+# Real Estate Domain — Cross-Folder Data Connection Guide
+
+## Data Source Overview
+
+### Zillow House Price Data/
+40 CSV files of US real estate time series in wide format: identifier columns + monthly date columns. Organized as **City-level** (`City_` prefix, ~10K–27K rows) and **State-level** (`State_` prefix, ~50 rows) variants.
+
+**City-level identifiers** (vary slightly across files): RegionName (city name), State (2-letter), SizeRank, Metro, CountyName. Some files also have RegionID, RegionType, StateName.
+**State-level identifiers**: RegionName (full state name), SizeRank, RegionID.
+
+**Five metric groups** (each has City + State files, with bedroom-type or property-type sub-variants):
+
+| Metric | Files | Date Range | Meaning |
+|--------|-------|------------|---------|
+| ZHVI | 8 City + 8 State (by bedroom count: 1–5+, AllHomes, Condo, SFR) | 1996–2020 | Typical home value index |
+| MedianRentalPrice | 8 City + 8 State (by bedroom count: Studio, 1–5+, AllHomes, SFR) | ~2010–2020 | Median listed rental price |
+| ZRI | 2 City + 2 State (AllHomes+Multifamily, SFR) | ~2010–2018 | Typical market rent index |
+| DaysOnZillow | 1 City + 1 State | 2010–2020 | Median listing days on market |
+| Sale_Prices | 1 City + 1 State | 2008–2020 | Median sale price |
+
+Note: State ZRI SFR file has a typo in filename ("Residenlce"). All 40 files share RegionName + State as join keys. Overlapping period across all metrics: ~2010–2018.
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: Zillow Internal — Cross-Metric + City↔State
+- All 40 files share RegionName/State as keys. Join ZHVI with MedianRentalPrice for price-to-rent ratios, DaysOnZillow with Sale_Prices for liquidity analysis, etc. City-level data can be aggregated to state level for validation against State-level files.
+
+### Connection 2: Zillow ↔ Other Datasets (via State/City name)
+- Zillow City-level files have RegionName (city), State (2-letter abbreviation), StateName (full name), Metro, CountyName.
+- Other datasets in this domain that contain State or City columns can be joined with Zillow on these geographic identifiers. State name format differences (full name vs. abbreviation) may require a mapping.
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+### Zillow Multi-File Patterns
+
+1. **Price-to-Rent Ratio**: Join ZHVI (AllHomes) with MedianRentalPrice (AllHomes) on (RegionName, State, date). Identify cities where buying vs. renting is more economical and track changes over time.
+
+2. **Bedroom Premium Analysis**: Compare ZHVI across bedroom counts (1–5+) for the same cities. Analyze which markets have the steepest size premiums and how they shift over the housing cycle.
+
+3. **Market Liquidity vs. Price**: Join DaysOnZillow with Sale_Prices on (RegionName, date). Analyze whether faster-selling cities command higher prices, and how this relationship changes during booms vs. downturns.
+
+4. **City-to-State Dispersion**: Compare City-level ZHVI against State-level ZHVI. Compute within-state coefficients of variation to identify the most heterogeneous housing markets.
+
+5. **Condo vs. Single-Family Divergence**: Join Zhvi_Condominum with Zhvi_SingleFamilyResidence to analyze the condo-SFR price gap across cities and time.
+
+6. **Metro-Level Aggregation**: Group City-level files by the Metro column to analyze metropolitan-area housing trends. Compare metros by ZHVI growth rate, rental price levels, and days on market.
+
+7. **National Market Segmentation**: Build state profiles from Zillow multi-metric data (ZHVI, rent, days on market, sale prices). Apply PCA + clustering to segment US states into housing market archetypes (e.g., high-growth coastal, affordable Midwest, volatile Sun Belt).
+
+### Cross-Dataset Patterns
+
+8. **Housing Value vs. External Factors**: Join Zillow State-level or City-level data with other domain datasets on State/City name + time period. Analyze how external factors (demographics, economic indicators, crime, education, etc.) correlate with housing price trends.
+
+9. **Full Pipeline**: (a) Identify top/bottom-appreciating states from Zillow ZHVI 1996–2020, (b) join with external datasets for contextual factors, (c) build regression models explaining cross-state price variation using multi-source features.

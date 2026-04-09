@@ -1,0 +1,175 @@
+# Healthcare Domain — Cross-Dataset Connection Guide
+
+## Data Source Overview
+
+### Healthcare-Diabetes.csv
+2,768 records of diabetes screening data. Columns: Id, Pregnancies, Glucose, BloodPressure, SkinThickness, Insulin, BMI, DiabetesPedigreeFunction, Age, Outcome (0/1 diabetes diagnosis).
+
+### heart_disease_uci.csv
+920 patient records from 4 medical centers. Columns: id, age, sex, dataset (hospital source), cp (chest pain type), trestbps (resting blood pressure), chol (cholesterol), fbs (fasting blood sugar >120), restecg, thalch (max heart rate), exang, oldpeak, slope, ca, thal, num (heart disease severity 0–4).
+
+### healthcare-dataset-stroke-data.csv
+5,110 records with stroke outcomes. Columns: id, gender, age, hypertension (0/1), heart_disease (0/1), ever_married, work_type, Residence_type, avg_glucose_level, bmi, smoking_status, stroke (0/1).
+
+### Sleep_health_and_lifestyle_dataset.csv
+374 records on sleep and health metrics. Columns: Person ID, Gender, Age, Occupation, Sleep Duration, Quality of Sleep, Physical Activity Level, Stress Level, BMI Category, Blood Pressure (string "systolic/diastolic"), Heart Rate, Daily Steps, Sleep Disorder.
+
+### insurance.csv
+1,338 medical insurance records. Columns: age, sex, bmi, children, smoker, region, charges.
+
+### thrombosis_prediction/
+SQLite database with 3 related tables:
+- **Patient** (1,238 rows): ID, SEX, Birthday, Description, First Date, Admission, Diagnosis.
+- **Examination** (806 rows): ID (→Patient.ID), Examination Date, aCL IgG/IgM/IgA, ANA, ANA Pattern, Diagnosis, KCT, RVVT, LAC, Symptoms, Thrombosis.
+- **Laboratory** (13,908 rows): ID (→Patient.ID), Date, plus 40+ lab tests — GOT, GPT, LDH, ALP, TP, ALB, UA, UN, CRE, T-BIL, T-CHO, TG, CPK, GLU, WBC, RBC, HGB, HCT, PLT, PT, APTT, FG, U-PRO, IGG, IGA, IGM, CRP, RA, RF, C3, C4, RNP, SM, SC170, SSA, SSB, CENTROMEA, DNA, DNA-II.
+
+### Chronic_Kidney_Disease/
+ARFF format, 400 records. Attributes: age, bp (blood pressure), sg (specific gravity), al (albumin), su (sugar), rbc, pc, pcc, ba, bgr (blood glucose random), bu (blood urea), sc (serum creatinine), sod, pot, hemo (hemoglobin), pcv (packed cell volume), wbcc, rbcc, htn (hypertension yes/no), dm (diabetes mellitus yes/no), cad (coronary artery disease yes/no), appet, pe, ane (anemia yes/no), class (ckd/notckd).
+
+### TCGA-PANCAN-HiSeq-801x20531/
+High-dimensional gene expression data. Two files:
+- **data.csv**: 801 samples × 20,531 gene expression columns (gene_0 to gene_20530).
+- **labels.csv**: 801 samples with Class — 5 cancer types: BRCA (breast, 300), KIRC (kidney, 146), LUAD (lung, 141), PRAD (prostate, 136), COAD (colon, 78).
+
+### TCGA-CDR-SupplementalTableS1.xlsx (multi-sheet Excel, 8 sheets)
+
+**Sheet: TCGA-CDR** (main data, 11,160 rows)
+Cancer patient clinical records across 33 cancer types. Key columns: bcr_patient_barcode, type (cancer abbreviation, e.g. BRCA, KIRC, LUAD), age_at_initial_pathologic_diagnosis, gender, race, ajcc_pathologic_tumor_stage, clinical_stage, histological_type, histological_grade, vital_status, tumor_status, OS/OS.time, DSS/DSS.time, DFI/DFI.time, PFI/PFI.time, treatment_outcome_first_course, cause_of_death, new_tumor_event_type/site/dx_days_to, Redaction.
+
+**Sheet: TCGA-CDR_Notes** (data dictionary)
+Documents the definition of every column in TCGA-CDR:
+- Survival endpoints: OS (overall survival, 1=death from any cause), DSS (disease-specific survival, 1=dead WITH tumor), DFI (disease-free interval, 1=new tumor event after initial remission), PFI (progression-free interval, 1=any progression/recurrence/death with cancer). Each has a paired `.time` column in days.
+- DFI derivation: based on treatment_outcome_first_course ("Complete Remission/Response"), residual_tumor ("R0"), or margin_status ("negative"), depending on tumor type availability. Not available for SKCM, THYM, UVM.
+- DSS is relatively accurate for CESC, PAAD, UVM; approximated for others.
+- Recommended endpoints: PFI (preferred, more accurate with short follow-up) and OS.
+
+**Sheet: ExtraEndpoints** (11,160 rows)
+Supplemental survival endpoints joined to TCGA-CDR on bcr_patient_barcode+type:
+- PFI.1 / PFI.time.1: PFI variant including N/A tumor events, censoring new primary in other organ.
+- PFI.2 / PFI.time.2: PFI variant excluding N/A tumor events.
+- PFS / PFS.time: Progression-free survival (includes death from any cause as event).
+- Competing-risk versions: DSS_cr, DFI.cr, PFI.cr, PFI.1.cr, PFI.2.cr (0=censored, 1=event of interest, 2=competing risk death), each with matching `.time.cr` column.
+
+**Sheet: ExtraEndpoints_Notes** (data dictionary for ExtraEndpoints)
+Defines the precise event/censoring criteria for each supplemental endpoint above.
+
+**Sheet: Table4_PHAssumptionTests** (30 rows — one per cancer type + PanCancer)
+Proportional hazards assumption tests for DFI by tumor type. Columns: Type, n, Disease_free (count), event_DF, With_disease (count), event_WD, p_assumption_test (cox.zph p-value), FDR. p < 0.05 indicates violation of PH assumption. Useful for determining which cancer types are suitable for Cox regression analysis.
+
+**Sheet: Table5_PHAssumptionTests** (43 rows — cancer types × new tumor event site)
+Proportional hazards tests stratified by new tumor event site (1st, 2nd, Others) for each of 4 endpoints (OS, PFI, DFI, DSS). Columns per endpoint: num, event, p_assumption_test, FDR. Helps identify which cancer-type × site combinations violate PH assumptions.
+
+**Sheet: Fig2EFG_AdditionalInfo** (19 rows — selected cancer types)
+Cox model results comparing high vs. low tumor stage. Three blocks: (1) PH assumption test p-values and FDR for OS/DSS/PFI; (2) Regular Cox model results: logHR, HR, se.logHR, p-value, 95%CI.HR for OS/PFI/DSS; (3) Competing-risk Cox model results for PFI/DSS; (4) Differences in logHR between regular and competing-risk models. Cancer types: ACC, BLCA, COAD, ESCA, HNSC, KIRC, KIRP, LUAD, LUSC, MESO, PAAD, SKCM, STAD, UVM.
+
+**Sheet: TSS_Info** (830 rows)
+Tissue Source Site lookup table. Columns: TSS Code, Source Site (institution name), Disease type (full cancer name). The TSS Code is embedded in bcr_patient_barcode (positions 6-7, e.g. "TCGA-**02**-..." → TSS Code "02" → "MD Anderson Cancer Center", "Glioblastoma multiforme"). Enables mapping patients to their source institution and full disease name.
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: Age (shared across nearly all datasets)
+- Diabetes: "Age" | Heart Disease: "age" | Stroke: "age" | Sleep: "Age" | Insurance: "age"
+- CKD: "age" | Thrombosis Patient: derive from "Birthday" | TCGA-CDR: "age_at_initial_pathologic_diagnosis"
+- All numeric, mostly integer years. Enables range-based grouping and demographic comparisons.
+
+### Connection 2: Gender/Sex (6 datasets)
+- Heart Disease: "sex" | Stroke: "gender" (Male/Female/Other) | Sleep: "Gender" | Insurance: "sex"
+- Thrombosis Patient: "SEX" (M/F) | TCGA-CDR: "gender" (MALE/FEMALE)
+- Note: Healthcare-Diabetes and CKD have NO gender/sex column.
+
+### Connection 3: Blood Pressure (5 datasets)
+- Diabetes: "BloodPressure" (diastolic, numeric) | Heart Disease: "trestbps" (resting systolic, numeric)
+- Stroke: "hypertension" (0/1 flag) | Sleep: "Blood Pressure" (string "systolic/diastolic", needs parsing)
+- CKD: "bp" (numeric) | Thrombosis Lab: related via blood test markers.
+- Different representations require normalization before comparison.
+
+### Connection 4: Blood Glucose (4 datasets)
+- Diabetes: "Glucose" (plasma glucose) | Stroke: "avg_glucose_level" (average glucose)
+- CKD: "bgr" (blood glucose random) | Thrombosis Lab: "GLU"
+- Heart Disease: "fbs" (fasting blood sugar >120 as 0/1 flag — less granular).
+
+### Connection 5: BMI / Body Metrics (4 datasets)
+- Diabetes: "BMI" (numeric) | Stroke: "bmi" (numeric) | Insurance: "bmi" (numeric)
+- Sleep: "BMI Category" (categorical: Normal/Overweight/Obese — needs mapping for numeric comparison).
+
+### Connection 6: Blood Lab Values (2 datasets, deep overlap)
+- CKD: wbcc, rbcc, hemo, sc (creatinine), bu (blood urea), sod, pot, pcv, al (albumin)
+- Thrombosis Lab: WBC, RBC, HGB (hemoglobin), CRE (creatinine), UN (urea nitrogen), ALB (albumin), PLT, T-CHO, TG, CRP, IGG/IGA/IGM
+- These share many overlapping lab test types with different naming conventions.
+
+### Connection 7: Disease Comorbidity Flags (cross-referencing conditions)
+- CKD: "htn" (hypertension), "dm" (diabetes), "cad" (coronary artery disease) as yes/no flags.
+- Stroke: "hypertension" and "heart_disease" as 0/1 flags.
+- These flag columns semantically reference the conditions that other datasets study in depth (Diabetes→dm, Heart Disease→cad/heart_disease, Blood Pressure→htn/hypertension).
+
+### Connection 8: Cancer Type (TCGA pair)
+- TCGA-PANCAN labels.csv: "Class" (BRCA, KIRC, LUAD, PRAD, COAD)
+- TCGA-CDR: "type" (same abbreviation system, 33 cancer types including all 5 above)
+- Direct categorical match. TCGA-CDR bridges TCGA-PANCAN to the clinical cluster via age/gender.
+
+### Connection 9: Smoking Status (2 datasets)
+- Stroke: "smoking_status" (formerly smoked / never smoked / smokes / Unknown)
+- Insurance: "smoker" (yes/no)
+
+### Connection 10: TCGA-CDR Internal Sheet Connections (within the Excel workbook)
+- **TCGA-CDR ↔ ExtraEndpoints**: Same patients (bcr_patient_barcode + type), ExtraEndpoints adds supplemental survival endpoints (PFI.1, PFI.2, PFS, and competing-risk versions of DSS/DFI/PFI). Combined analysis enables comparing standard vs. competing-risk survival models.
+- **TCGA-CDR ↔ TSS_Info**: bcr_patient_barcode contains embedded TSS Code (characters 6-7). TSS_Info maps this code to Source Site (institution name) and full Disease type name. Enables institution-level analysis and full disease name resolution.
+- **TCGA-CDR ↔ Table4_PHAssumptionTests**: Join on cancer type. Table4 provides PH assumption test results for DFI per cancer type — determines which types are suitable for Cox regression.
+- **TCGA-CDR ↔ Table5_PHAssumptionTests**: Join on cancer type. Stratified PH assumption tests by new tumor event site for OS/PFI/DFI/DSS.
+- **TCGA-CDR ↔ Fig2EFG_AdditionalInfo**: Join on cancer type. Pre-computed Cox model results (logHR, HR, CI, p-value) for high vs. low tumor stage, including competing-risk models. Enables direct validation or meta-analysis.
+
+### Connection 11: TSS_Info → Multi-Center Analysis Bridge
+- TSS_Info (Source Site) provides institution-level grouping for TCGA patients, similar to how Heart Disease UCI has "dataset" for hospital source.
+- Enables comparing survival outcomes or treatment patterns across institutions (e.g., MD Anderson vs. Memorial Sloan Kettering) for the same cancer type.
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+### Single-Dataset Patterns
+
+1. **Diabetes Classification**: Train classifiers (Logistic Regression, Random Forest, SVM) on the 8 clinical features to predict Outcome. Analyze feature importance — which factors (Glucose, BMI, Age) are most predictive?
+
+2. **Heart Disease Multi-Center Comparison**: The "dataset" column identifies 4 hospital sources. Compare heart disease prevalence, feature distributions, and model performance across centers.
+
+3. **TCGA High-Dimensional Feature Selection**: With 20,531 gene columns, apply dimensionality reduction (PCA, t-SNE, UMAP) or feature selection (Lasso, mutual information) to identify genes most discriminative of the 5 cancer types.
+
+4. **Thrombosis Multi-Table Analysis**: Join Patient → Examination → Laboratory on ID. Analyze temporal lab trends per patient, correlate lab values with thrombosis outcomes. Requires SQL or multi-table merging.
+
+5. **Sleep Disorder Profiling**: Parse the "Blood Pressure" string column into systolic/diastolic numerics. Analyze how sleep duration, physical activity, and stress relate to BMI, heart rate, and sleep disorder type.
+
+### Multi-Dataset Patterns
+
+6. **Metabolic Syndrome Risk Pipeline**: Merge Diabetes (Glucose, BMI, BloodPressure) with Stroke (avg_glucose_level, bmi, hypertension) on age ranges to build a unified metabolic risk profile. Analyze whether diabetes indicators predict stroke risk.
+
+7. **Comorbidity Network Analysis**: Use CKD's disease flags (dm, htn, cad) as a bridge — link diabetes outcomes to kidney disease, hypertension to heart disease, and coronary artery disease across datasets. Quantify comorbidity co-occurrence patterns.
+
+8. **Healthcare Cost Modeling**: Join Insurance (charges, smoker, bmi) with Stroke/Diabetes risk factors via age+sex+bmi to estimate how chronic disease risk factors drive medical costs.
+
+9. **Lab Value Cross-Validation**: Compare overlapping lab tests between CKD and Thrombosis (hemoglobin, creatinine, WBC, RBC, albumin) — do the value distributions differ between autoimmune (thrombosis) and renal (CKD) patient populations?
+
+10. **Genomic-Clinical Cancer Analysis**: Join TCGA-PANCAN (gene expression) with TCGA-CDR (clinical outcomes) on cancer type. Analyze whether gene expression patterns correlate with survival time, tumor stage, or treatment outcomes within each cancer type.
+
+11. **Lifestyle–Disease Correlation**: Combine Sleep (sleep duration, physical activity, stress, heart rate) with Stroke (smoking, glucose, bmi) and Insurance (smoker, charges) via age+gender to explore how lifestyle factors associate with disease outcomes and healthcare costs.
+
+12. **Blood Pressure Across Conditions**: Normalize blood pressure from Diabetes (BloodPressure), Heart Disease (trestbps), Sleep (parsed systolic/diastolic), and CKD (bp). Compare distributions across healthy vs. diseased populations to identify condition-specific blood pressure profiles.
+
+### TCGA-CDR Auxiliary Sheet Patterns (high-quality evaluation topics)
+
+13. **Competing-Risk Survival Comparison**: Join TCGA-CDR (main) with ExtraEndpoints on patient barcode. For a specific cancer type (e.g., KIRC), fit both standard Cox PH models and competing-risk models (Fine-Gray) for DSS and PFI. Compare the hazard ratios. Reference Fig2EFG_AdditionalInfo to validate your results against the published values. Skills: multi-sheet Excel reading, survival analysis, competing-risk modeling, result validation.
+
+14. **Proportional Hazards Suitability Check**: Load Table4_PHAssumptionTests to identify cancer types where the PH assumption is violated (FDR < 0.05). Then load TCGA-CDR main data, filter to those cancer types, and demonstrate alternative survival methods (e.g., time-varying coefficients, restricted mean survival time). Skills: hypothesis testing, survival modeling, data filtering.
+
+15. **Multi-Center Cancer Outcome Disparity**: Extract TSS Code from bcr_patient_barcode in TCGA-CDR, join with TSS_Info to map each patient to their Source Site institution. For a given cancer type (e.g., BRCA), compare OS and PFI across top-5 contributing institutions using Kaplan-Meier curves and log-rank tests. Investigate whether institutional differences persist after adjusting for stage and age. Skills: string parsing, multi-sheet joining, survival analysis, confounding adjustment.
+
+16. **TSS-Based Patient Distribution & Geography**: Join TCGA-CDR with TSS_Info to analyze the geographic/institutional distribution of TCGA samples. Compute per-institution patient counts stratified by cancer type. Visualize as a heatmap or stacked bar chart. Identify institution specialization patterns (e.g., which centers contribute primarily to which cancer types). Skills: data joining, aggregation, heatmap visualization.
+
+17. **Cancer Endpoint Concordance Analysis**: From TCGA-CDR main sheet, compute pairwise concordance between the 4 survival endpoints (OS, DSS, DFI, PFI) across cancer types — when a patient has an OS event, how often do they also have DSS/DFI/PFI events? Use ExtraEndpoints to extend this to PFI.1/PFI.2/PFS variants. Reference TCGA-CDR_Notes for correct interpretation of endpoint definitions. Skills: multi-sheet Excel, cross-tabulation, correlation analysis, domain-informed data interpretation.
+
+18. **Stage-Stratified Hazard Ratio Replication**: Replicate the Cox model results from Fig2EFG_AdditionalInfo using raw TCGA-CDR patient data. For a selected cancer type, dichotomize ajcc_pathologic_tumor_stage into high/low, fit Cox models for PFI and DSS, and compare your logHR/HR/CI with the pre-computed values in Fig2EFG. Assess whether proportional hazards hold using Table4/Table5. Skills: data wrangling, Cox regression, model comparison, PH diagnostics.
+
+19. **Genomic-Clinical-Institutional Cancer Pipeline**: Join TCGA-PANCAN gene expression with TCGA-CDR clinical data on cancer type, then enrich with TSS_Info for institutional source and ExtraEndpoints for competing-risk survival. Build a predictive model: can gene expression features predict PFI while controlling for institution and stage? Skills: high-dimensional joining, feature selection, survival modeling, confounding control. Uses 4+ data files across folders.
+
+20. **DFI Derivation Logic Verification**: Using TCGA-CDR_Notes as specification, verify DFI derivation from TCGA-CDR raw columns. For each cancer type, check whether DFI events align with treatment_outcome_first_course/residual_tumor/margin_status as documented. Count discrepancies. Confirm that SKCM/THYM/UVM have all-NaN DFI. Skills: complex conditional logic, data quality validation, domain knowledge application.

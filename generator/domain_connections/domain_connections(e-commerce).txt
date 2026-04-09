@@ -1,0 +1,138 @@
+# E-Commerce Domain — Cross-Source Data Connection Guide
+
+## Data Source Overview
+
+### Cell_Phones_and_Accessories.json
+JSONL file with ~194K Amazon product reviews for cell phones and accessories. Each line is one review.
+
+- **reviewerID**: Reviewer identifier.
+- **asin**: Amazon Standard Identification Number (product ID).
+- **reviewerName**: Display name of the reviewer.
+- **helpful**: [helpful_votes, total_votes] array.
+- **reviewText**: Full review text.
+- **overall**: Rating (1.0–5.0).
+- **summary**: Short review title.
+- **unixReviewTime / reviewTime**: Timestamp.
+
+### meta_Cell_Phones_and_Accessories.json
+JSONL file with ~590K Amazon product metadata entries. Each line is one product. Note: ~14% of records have main_cat outside "Cell Phones & Accessories" (e.g., "All Electronics", "Computers") — filtering or grouping by main_cat may be needed.
+
+- **asin**: Amazon product ID — **direct join key with Cell_Phones_and_Accessories.json**.
+- **title**: Product title.
+- **brand**: Brand name (e.g., "Samsung", "Apple", "LG"). ~6,700 unique brands.
+- **price**: Listed price (string, may need cleaning).
+- **category**: Hierarchical category list (e.g., ["Cell Phones & Accessories", "Accessories", "Screen Protectors"]).
+- **main_cat**: Top-level Amazon category.
+- **feature**: Product feature bullet points (list of strings).
+- **tech1 / tech2**: Technical specification tables (raw text or HTML).
+- **description**: Product description (list of strings).
+- **also_buy / also_view**: Lists of related product ASINs — enables co-purchase and co-view network analysis.
+- **rank**: Amazon sales rank string.
+- **details**: Dict with misc attributes (e.g., shipping weight, model number, ASIN).
+
+### EbayPcLaptopsAndNetbooksUnclean.csv
+~6,600 eBay laptop/netbook listings. Raw and unclean — prices have "$" prefix and trailing spaces, many columns have missing values. Good for data cleaning exercises.
+
+- **Brand**: Manufacturer (e.g., "Dell", "Apple", "Lenovo"). ~135 unique values including typos.
+- **Price**: Listed price (string like "$303.68 ").
+- **Rating / Ratings Count**: Seller rating and count.
+- **Condition / Seller Note**: Item condition (New, Refurbished, etc.) with long free-text seller notes.
+- **Hardware specs**: Processor, Screen Size, Ram Size, SSD Capacity, GPU, Processor Speed, Hard Drive Capacity, Storage Type, Maximum Resolution, OS.
+- **Type**: Device type (Notebook/Laptop, 2-in-1, etc.).
+- **Release Year / Model**: Product identification.
+- **Country Region Of Manufacture**: Manufacturing origin.
+
+### Brazilian E-Commerce/
+Olist Brazilian e-commerce dataset — 9 CSV files forming a star schema around ~100K orders (2016–2018). Product categories are in Portuguese; use product_category_name_translation.csv for English mapping.
+
+- **olist_orders_dataset.csv**: order_id, customer_id, order_status, order_purchase_timestamp, order_approved_at, order_delivered_carrier_date, order_delivered_customer_date, order_estimated_delivery_date.
+- **olist_order_items_dataset.csv**: order_id, order_item_id, product_id, seller_id, shipping_limit_date, price, freight_value.
+- **olist_customers_dataset.csv**: customer_id, customer_unique_id, customer_zip_code_prefix, customer_city, customer_state.
+- **olist_sellers_dataset.csv**: seller_id, seller_zip_code_prefix, seller_city, seller_state.
+- **olist_products_dataset.csv**: product_id, product_category_name, product_name_lenght, product_description_lenght, product_photos_qty, product_weight_g, product_length/height/width_cm.
+- **olist_order_payments_dataset.csv**: order_id, payment_sequential, payment_type, payment_installments, payment_value.
+- **olist_order_reviews_dataset.csv**: review_id, order_id, review_score (1–5), review_comment_title, review_comment_message, review_creation_date, review_answer_timestamp.
+- **olist_geolocation_dataset.csv**: geolocation_zip_code_prefix, geolocation_lat, geolocation_lng, geolocation_city, geolocation_state.
+- **product_category_name_translation.csv**: product_category_name → product_category_name_english. Key electronics categories: telephony (1,134), computers_accessories (1,639), electronics (517), consoles_games (317).
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: ASIN (direct key join)
+- Cell_Phones_and_Accessories.json: **asin** column.
+- meta_Cell_Phones_and_Accessories.json: **asin** column.
+- ~40% hit rate when sampling. Enables enriching reviews with product title, brand, price, category, features, and co-purchase networks.
+
+### Connection 2: Brand (fuzzy match across electronics datasets)
+- meta_Cell_Phones: **brand** (~6,700 unique brands).
+- EbayPcLaptops: **Brand** (~135 unique values).
+- 26 confirmed overlapping brands including Apple, Samsung, Dell, HP, Lenovo, Asus, Acer, LG, Huawei, Microsoft, Google, Razer, Panasonic.
+- Matching requires case normalization and deduplication (e.g., "ASUS" vs "Asus").
+
+### Connection 3: Price (semantic parallel, different scales)
+- meta_Cell_Phones: **price** (phone accessories, string format).
+- EbayPcLaptops: **Price** (laptops, string with "$" prefix).
+- Brazilian E-Commerce: **price** in olist_order_items (general merchandise, numeric, BRL).
+- All measure product price but in different currencies (USD vs BRL), categories, and formats. Cross-source price analysis requires currency conversion and category alignment.
+
+### Connection 4: Review Score / Rating (1–5 scale across all sources)
+- Cell_Phones: **overall** (1.0–5.0).
+- Brazilian E-Commerce: **review_score** in olist_order_reviews (1–5).
+- EbayPcLaptops: **Rating** (seller rating, different semantics — seller vs product).
+- Enables cross-platform review behavior comparison. Note the eBay rating is seller-level, not product-level.
+
+### Connection 5: Product Category (semantic match)
+- meta_Cell_Phones: **category** (hierarchical list) and **main_cat** (top-level).
+- EbayPcLaptops: implicitly "Computers > Laptops & Netbooks".
+- Brazilian E-Commerce: **product_category_name** (Portuguese, translate via lookup table). Electronics-related: telephony, computers_accessories, electronics, consoles_games.
+- Cross-source category analysis requires manual taxonomy mapping.
+
+### Connection 6: Brazilian E-Commerce Internal Keys
+- **order_id** links: orders ↔ order_items ↔ payments ↔ reviews.
+- **customer_id** links: orders ↔ customers.
+- **product_id** links: order_items ↔ products.
+- **seller_id** links: order_items ↔ sellers.
+- **zip_code_prefix** links: customers/sellers ↔ geolocation.
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+### Amazon Review + Metadata (Cell_Phones ↔ meta_Cell_Phones)
+
+1. **Review-Enriched Product Analysis**: Join reviews with metadata on asin. Analyze how brand, price tier, and category affect average rating and review volume.
+
+2. **Co-Purchase Network**: Build a product graph from also_buy/also_view lists in metadata. Identify product communities and analyze whether highly-connected products receive better reviews.
+
+3. **Helpfulness Prediction**: Using review text, rating, and product metadata (brand, price, category) as features, predict the helpful vote ratio.
+
+4. **Brand Sentiment Profiling**: Aggregate review sentiment by brand (from metadata join). Rank brands by average rating, review volume, and text sentiment polarity.
+
+### eBay Laptops (standalone + cross-source)
+
+5. **Data Cleaning Pipeline**: Clean Price (remove "$", convert to numeric), handle missing hardware specs, normalize Brand names, parse Condition/Seller Note free text. Compute completeness metrics.
+
+6. **Cross-Platform Electronics Pricing**: Compare laptop prices (eBay) with phone accessory prices (meta_Cell_Phones) by shared brands. Analyze brand premium patterns across product categories.
+
+7. **Hardware Spec Analysis**: Analyze relationships between hardware specifications (Processor, RAM, SSD, GPU) and price. Identify which specs most influence pricing using regression or feature importance.
+
+### Brazilian E-Commerce (internal multi-table)
+
+8. **Order Pipeline Analytics**: Join orders → items → payments → reviews across the star schema. Analyze the full customer journey: purchase → payment → delivery → review.
+
+9. **Delivery Performance**: Compute delivery delay (delivered_customer_date − estimated_delivery_date). Analyze how delay correlates with review_score, product category, seller location, and freight_value.
+
+10. **Customer Segmentation**: Build RFM (Recency, Frequency, Monetary) profiles from orders and payments. Segment customers and analyze segment-level review behavior.
+
+11. **Geospatial Seller-Customer Analysis**: Join sellers and customers with geolocation via zip_code_prefix. Analyze shipping distance patterns, regional seller concentration, and geographic price variation.
+
+12. **Payment Behavior**: Analyze payment_type distribution (credit_card, boleto, voucher, debit_card) and installment patterns across product categories and price tiers.
+
+### Cross-Source (3+ datasets)
+
+13. **Cross-Platform Review Comparison**: Compare review score distributions, text length, and sentiment patterns between Amazon phone reviews and Olist reviews (filtered to telephony/electronics categories). Analyze whether platform and country affect review behavior.
+
+14. **Electronics Brand Ecosystem**: (a) From meta_Cell_Phones, profile top brands by product count, price range, and category spread. (b) From Cell_Phones reviews, compute brand-level rating and sentiment. (c) From eBay Laptops, compare the same brands' laptop pricing. (d) From Olist, check if these brands appear in Brazilian electronics orders. Build a multi-platform brand scorecard.
+
+15. **Price–Review Relationship Across Platforms**: (a) Join Cell_Phones with meta_Cell_Phones for Amazon price+rating. (b) Use eBay Price+Rating for laptops. (c) Use Olist price+review_score. Compare the price–satisfaction relationship across platforms and product categories.

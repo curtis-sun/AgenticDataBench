@@ -1,0 +1,77 @@
+# Tourism Domain — Cross-Folder Data Connection Guide
+
+## Data Source Overview
+
+### Airbnb_Open_Data.csv
+~103K listings of short-term rentals in New York City. Each row is one listing.
+
+- **Geography**: neighbourhood group, neighbourhood, lat, long, country, country code.
+- **Listing**: NAME, room type (Private room / Entire home/apt / Shared room), Construction year, instant_bookable.
+- **Pricing**: price, service fee (string with "$" and space — need cleaning).
+- **Reviews**: number of reviews, last review (date), reviews per month, review rate number (1–5).
+- **Host**: host id, host name, host_identity_verified, calculated host listings count.
+- **Availability**: minimum nights, availability 365, cancellation_policy.
+
+### FISETIO … /datasets/
+UK attraction visitor data with weather, covering museums (indoor) and parks (outdoor) monthly from 2010–2019.
+
+- **indoors.csv** (~2.7K rows): date (YYYY-MM), museum, visits, tmax, tmin, air_frost_days, rain, sunny_hr, rating, revs, mus_ID.
+- **outdoors.csv** (~2.9K rows): date, y (visits), temp, tempmax, tempmin, tempdif, pcp, rev, rate, park_id, park_name.
+- **indoors_list_museums.csv** (27 rows): ID, name, TA_link, city, fee (free/paid), climate_station. Lookup table for indoors.csv via mus_ID ↔ ID.
+
+### TripAdvisor Indonesia Tourism/
+Normalized relational dataset of tourist attraction visits in Indonesia. 9 Excel files forming a star schema.
+
+- **Fact table**: Transaction.xlsx (~53K rows) — TransactionId, UserId, VisitYear, VisitMonth, VisitMode, AttractionId, Rating.
+- **Dimensions**:
+  - User.xlsx (~33.5K rows): UserId, ContenentId, RegionId, CountryId, CityId.
+  - Item.xlsx (30 rows): AttractionId, AttractionCityId, AttractionTypeId, Attraction, AttractionAddress.
+  - Type.xlsx (17 rows): AttractionTypeId, AttractionType.
+  - Mode.xlsx (6 rows): VisitModeId, VisitMode.
+  - City.xlsx (~9.1K rows): CityId, CityName, CountryId.
+  - Country.xlsx (165 rows): CountryId, Country, RegionId.
+  - Region.xlsx (22 rows): Region, RegionId, ContentId.
+  - Continent.xlsx (6 rows): ContenentId, Contenent.
+
+---
+
+## Cross-Source Connection Points
+
+### Connection 1: Rating / Review Score
+- Airbnb: review rate number (1–5), number of reviews, reviews per month.
+- FISETIO indoors: rating, revs; outdoors: rate, rev.
+- TripAdvisor: Transaction.Rating.
+- All three measure visitor satisfaction on similar scales, enabling cross-sector comparison (accommodation vs attraction).
+
+### Connection 2: Time Dimension
+- FISETIO: date (YYYY-MM), range 2010–2019.
+- TripAdvisor: VisitYear + VisitMonth, similar range.
+- Airbnb: last review (date), Construction year.
+- Monthly granularity aligns between FISETIO and TripAdvisor for temporal trend analysis.
+
+### Connection 3: Geography (conceptual, not direct join)
+- Airbnb: New York City (lat/long, neighbourhood).
+- FISETIO: UK cities (city column in museum lookup — London, Edinburgh, etc.).
+- TripAdvisor: Indonesia (hierarchical: Continent → Region → Country → City).
+- No direct geographic overlap, but Country.xlsx contains 165 countries (potential bridge to external data). City-level and country-level analyses can be compared across sources.
+
+### Connection 4: Visitor Volume / Demand
+- FISETIO: monthly visits (visits / y columns) — actual footfall counts.
+- TripAdvisor: Transaction count per attraction per month — proxy for visit volume.
+- Airbnb: number of reviews and availability 365 — proxy for booking demand.
+
+---
+
+## Suggested Cross-Source Analysis Patterns
+
+1. **Rating Distribution Comparison**: Compare rating/review score distributions across the three data sources (Airbnb listings vs UK museums vs Indonesian attractions). Analyze whether accommodation ratings follow different patterns than attraction ratings.
+
+2. **Seasonality Analysis**: Use FISETIO monthly visits and TripAdvisor (VisitYear, VisitMonth) to detect seasonal peaks. Compare with Airbnb review activity (last review dates) to identify whether accommodation demand aligns with attraction visit peaks.
+
+3. **Weather–Visitor Correlation (FISETIO internal)**: Regression or correlation analysis between weather variables (temp, rain, sunny_hr) and visitor counts for museums vs parks. Indoor attractions may show inverse weather sensitivity compared to outdoor ones.
+
+4. **Star Schema Drill-Down (TripAdvisor internal)**: Join all 9 dimension/fact tables to analyze rating patterns by attraction type, visit mode, user origin continent/region, and city. Practice multi-table join and dimensional modeling.
+
+5. **Pricing and Demand Analysis (Airbnb)**: Clean price/service fee strings, analyze pricing by room type, neighbourhood group, and cancellation policy. Correlate price with review rate and availability to model price–demand relationships.
+
+6. **Cross-Domain Tourism Profile**: Aggregate each source to its highest common granularity (e.g., monthly or yearly averages) and build a comparative tourism profile — average rating, visit volume trend, and demand seasonality — across NYC accommodation, UK attractions, and Indonesian attractions.
