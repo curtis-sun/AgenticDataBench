@@ -89,6 +89,25 @@ def find_matching_key(target_key: str, available_keys: list, strict_first: bool 
     return best_match
 
 
+def count_nested_fields(threshold: dict) -> int:
+    """
+    Count the total number of fields in a nested threshold configuration.
+
+    Args:
+        threshold: A threshold dict (possibly nested)
+
+    Returns:
+        Total count of non-dict threshold values (leaf nodes)
+    """
+    count = 0
+    for v in threshold.values():
+        if isinstance(v, dict):
+            count += count_nested_fields(v)
+        else:
+            count += 1
+    return count
+
+
 def compare_json(
     output_file_name: str = 'output.json',
     gold_file_name: str = 'result.json',
@@ -417,6 +436,25 @@ def compare_json(
         """
         Recursively traverse threshold configuration and evaluate fields.
         """
+        # Check for type mismatch between output and gold
+        if isinstance(gold_obj, list) and not isinstance(output_obj, list):
+            logging.warning(f"{obj_path}: type mismatch - gold is list but output is {type(output_obj).__name__}, cannot compare")
+            # Count fields same as when both are lists: for each gold item, count threshold fields
+            fields_per_item = count_nested_fields(threshold_obj) if threshold_obj else 0
+            total_fields = len(gold_obj) * fields_per_item
+            if total_fields > 0:
+                scores.extend([0.0] * total_fields)
+                errors.append((0.0, f"{obj_path}: type mismatch - gold is list with {len(gold_obj)} items but output is {type(output_obj).__name__}, expected list format"))
+            return
+        if isinstance(output_obj, list) and not isinstance(gold_obj, list):
+            logging.warning(f"{obj_path}: type mismatch - output is list but gold is {type(gold_obj).__name__}, cannot compare")
+            # Count fields same as when both are dicts: count threshold fields
+            total_fields = count_nested_fields(threshold_obj) if threshold_obj else 0
+            if total_fields > 0:
+                scores.extend([0.0] * total_fields)
+                errors.append((0.0, f"{obj_path}: type mismatch - output is list but gold is {type(gold_obj).__name__}, cannot match items"))
+            return
+
         # If both are lists and matched_keys provided, do unordered comparison
         if isinstance(output_obj, list) and isinstance(gold_obj, list):
             if not matched_keys:
@@ -472,14 +510,6 @@ def compare_json(
                     for key, threshold in threshold_obj.items():
                         if isinstance(threshold, dict):
                             # Nested threshold: count nested fields
-                            def count_nested_fields(th):
-                                count = 0
-                                for v in th.values():
-                                    if isinstance(v, dict):
-                                        count += count_nested_fields(v)
-                                    else:
-                                        count += 1
-                                return count
                             field_count = count_nested_fields(threshold)
                             scores.extend([0.0] * field_count)
                         else:
@@ -504,14 +534,6 @@ def compare_json(
                                     logging.warning(f"{field_path}.{key}: key not found in matched output item (tried '{key}', available keys: {matched_item_keys}), scoring 0 for all its fields")
                                 if matched_key_gold is None:
                                     logging.warning(f"{field_path}.{key}: key not found in gold item (tried '{key}', available keys: {gold_item_keys}), scoring 0 for all its fields")
-                                def count_nested_fields(th):
-                                    count = 0
-                                    for v in th.values():
-                                        if isinstance(v, dict):
-                                            count += count_nested_fields(v)
-                                        else:
-                                            count += 1
-                                    return count
                                 field_count = count_nested_fields(threshold)
                                 scores.extend([0.0] * field_count)
                                 errors.append((0.0, f"{field_path}.{key}: key not found"))
@@ -529,9 +551,9 @@ def compare_json(
                                     scores.append(0.0)
                                     errors.append((0.0, f"{field_path}.{key}: key not found in output"))
                             else:
-                                    logging.warning(f"{field_path}.{key}: key not found in gold item (tried '{key}', available keys: {gold_item_keys}), scoring 0")
-                                    scores.append(0.0)
-                                    errors.append((0.0, f"{field_path}.{key}: key not found in gold"))
+                                logging.warning(f"{field_path}.{key}: key not found in gold item (tried '{key}', available keys: {gold_item_keys}), scoring 0")
+                                scores.append(0.0)
+                                errors.append((0.0, f"{field_path}.{key}: key not found in gold"))
 
             # Sample errors for unmatched items (max 10, sorted by item_label for consistency)
             if unmatched_items:
@@ -561,14 +583,6 @@ def compare_json(
                     else:
                         # Missing nested object - score 0 for all its fields
                         logging.warning(f"{field_path}: missing nested object in output or gold, scoring 0 for all its fields")
-                        def count_nested_fields(th):
-                            count = 0
-                            for v in th.values():
-                                if isinstance(v, dict):
-                                    count += count_nested_fields(v)
-                                else:
-                                    count += 1
-                            return count
                         field_count = count_nested_fields(threshold)
                         scores.extend([0.0] * field_count)
                         errors.append((0.0, f"{field_path}: key not found"))
@@ -984,14 +998,6 @@ def compare_json_normalized(
                     else:
                         # Missing nested object - score 0 for all its fields
                         logging.warning(f"{field_path}: missing nested object in output (tried '{key}', available keys: {output_keys}), scoring 0 for all its fields")
-                        def count_nested_fields(th):
-                            count = 0
-                            for v in th.values():
-                                if isinstance(v, dict):
-                                    count += count_nested_fields(v)
-                                else:
-                                    count += 1
-                            return count
                         field_count = count_nested_fields(threshold)
                         scores.extend([0.0] * field_count)
                         errors.append((0.0, f"{field_path}: key not found"))

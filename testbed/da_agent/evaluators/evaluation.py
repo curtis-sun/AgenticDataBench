@@ -77,43 +77,25 @@ class Evaluator:
 
         gold_id_dir = os.path.join(self.gold_dir, id)
 
-        # Check for code files in output_id_dir
-        code_files = []
-        for ext in ['.ipynb', '.py']:
-            code_files.extend([os.path.join(output_id_dir, f) for f in os.listdir(output_id_dir)
-                             if f.endswith(ext)])
-
-        # Sort by modification time, keep only non-empty files
-        code_files = [f for f in code_files if os.path.getsize(f) > 0]
-        code_files.sort(key=os.path.getmtime, reverse=True)
-
-        if code_files:
+        if 'smolagents' in self.gold_dir:
+            code_file = os.path.join(output_id_dir, 'code.ipynb')
             code_content = {}
-            for code_file in code_files:  # Only process the most recent file if multiple exist
-                try:
-                    with open(code_file, 'r', encoding='utf-8') as f:
-                        if code_file.endswith('.ipynb'):
-                            import nbformat
-                            notebook = nbformat.read(f, as_version=4)
-                            cells = []
-                            for idx, cell in enumerate(notebook.cells):
-                                if cell.source and cell.source.strip():
-                                    cell_type = 'code' if cell.cell_type == 'code' else 'markdown'
-                                    cells.append({
-                                        'id': idx,
-                                        'type': cell_type,
-                                        'content': cell.source
-                                    })
-                            code_content[os.path.basename(code_file)] = cells
-                        else:
-                            # For .py files, read as single code cell
-                            code_content[os.path.basename(code_file)] = [{
-                                'id': 0,
-                                'type': 'code',
-                                'content': f.read()
-                            }]
-                except Exception as e:
-                    logging.warning(f"Failed to read code file {code_file}: {e}")
+            try:
+                with open(code_file, 'r', encoding='utf-8') as f:
+                    import nbformat
+                    notebook = nbformat.read(f, as_version=4)
+                    cells = []
+                    for idx, cell in enumerate(notebook.cells):
+                        if cell.source and cell.source.strip():
+                            cell_type = 'code' if cell.cell_type == 'code' else 'markdown'
+                            cells.append({
+                                'id': idx,
+                                'type': cell_type,
+                                'content': cell.source
+                            })
+                    code_content[os.path.basename(code_file)] = cells
+            except Exception as e:
+                logging.warning(f"Failed to read code file {code_file}: {e}")
             if code_content:
                 trajectory_info['code'] = code_content
 
