@@ -70,6 +70,10 @@ python3 evaluate.py --output_dir output/da-agent-qwen-{experiment_id}
 <img src="docs/img/pipeline.png" width="400px">
 </div>
 
+## 📋 Test Set
+
+For leaderboard integrity, we withhold 100 tasks as a private test set. These tasks will be publicly released once the benchmark loses its evaluation significance.
+
 ## 📊 Result Uploading
 
 Benchmark results are stored in `testbed/results`.
