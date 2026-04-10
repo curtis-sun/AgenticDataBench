@@ -14,6 +14,7 @@ except ImportError:
 
 
 DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
+DASHSCOPE_API_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 QWEN_MODEL = "qwen3-max-2026-01-23"
 
 DATASETS_DIR = "./datasets"

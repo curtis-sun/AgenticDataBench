@@ -1,0 +1,32 @@
+# Core dependencies
+docker
+gymnasium
+requests
+
+# Data processing
+pandas
+numpy
+
+# Visualization
+matplotlib
+Pillow
+
+# Machine learning
+scikit-learn
+fuzzywuzzy
+joblib
+
+# Notebook generation
+nbformat
+jsonlines
+
+# Progress bar
+tqdm
+
+# Smolagents (alternative agent implementation)
+smolagents
+websocket-client
+openai
+
+# Evaluation utilities
+python-Levenshtein  # For fuzzywuzzy performance

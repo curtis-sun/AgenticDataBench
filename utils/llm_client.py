@@ -6,14 +6,15 @@ import json
 import re
 from typing import Dict, Optional
 
-from config import DASHSCOPE_API_KEY, QWEN_MODEL
+from config import DASHSCOPE_API_KEY, DASHSCOPE_API_BASE, QWEN_MODEL
 
 
 class QwenClient:
     """Wrapper for Qwen API (supports both dashscope and openai-compatible mode)"""
     
-    def __init__(self, api_key: str = None, model: str = QWEN_MODEL):
+    def __init__(self, api_key: str = None, base_url: str = None, model: str = QWEN_MODEL):
         self.api_key = api_key or DASHSCOPE_API_KEY
+        self.base_url = base_url or DASHSCOPE_API_BASE
         self.model = model
         self.client = None
         self.use_dashscope = False
@@ -28,7 +29,7 @@ class QwenClient:
             from openai import OpenAI
             self.client = OpenAI(
                 api_key=self.api_key,
-                base_url="https://dashscope.aliyuncs.com/compatible-mode/v1"
+                base_url=self.base_url
             )
         except ImportError:
             # Fall back to dashscope native
