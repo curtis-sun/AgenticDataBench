@@ -58,11 +58,6 @@ Creates `output/roundN/` with one JSONL file per domain. Key options:
 - `--append` — incremental fill mode. Scans all existing `output/roundN/` directories and counts cases already generated per domain. Only the shortfall (target minus existing) is generated; new cases are written to a new `output/roundN+1/` directory without touching existing files. 
 - `--min_steps 3` / `--max_steps 8` — step count range per case (defaults: 3 and 8)
 
-**Single-process**
-```bash
-python synthesizer.py --max_cases 10 --max_steps 10 --domain healthcare
-```
-
 **Prune to minimal coverage (optional)**
 ```bash
 python greedy_select.py --output_dir ./output/round1 --coverage_target 1.0
