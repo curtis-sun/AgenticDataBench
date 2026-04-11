@@ -13,6 +13,46 @@ import logging
 import re
 
 
+def truncate_errors(errors_list, max_count=50, max_str_len=5000, mode='min'):
+    """
+    Truncate list of error messages to max_count and max_str_len characters.
+
+    Args:
+        errors_list: List of tuples (error_score, error_message)
+        max_count: Maximum number of errors to keep
+        max_str_len: Maximum string length for combined message
+        mode: 'min' for evaluate_field (0=worst, 1=best),
+              'max' for evaluate_field_normalized (0=best, 1=worst)
+
+    Returns:
+        Tuple of (error_score, truncated_combined_msg)
+    """
+    if not errors_list:
+        if mode == 'min':
+            return 1.0, ""
+        else:
+            return 0.0, ""
+
+    # Sort by error_score and take max_count
+    sorted_errors = sorted(errors_list, key=lambda x: (x[0], x[1]))[:max_count]
+
+    # Get error_score based on mode
+    if mode == 'min':
+        error_score = min(es for es, _ in sorted_errors)
+    else:
+        error_score = max(es for es, _ in sorted_errors)
+
+    # Combine messages
+    messages = [msg for _, msg in sorted_errors]
+    combined = "; ".join(messages)
+
+    # Truncate if too long
+    if len(combined) > max_str_len:
+        combined = combined[:max_str_len] + "..."
+
+    return error_score, combined
+
+
 def normalize_key(key: str) -> str:
     """
     Normalize a key for fuzzy matching:
@@ -263,8 +303,7 @@ def compare_json(
                         element_scores.append(0.0)
                         element_errors.append((0.0, f"{field_path}[{i}]: no matching element found in output"))
                 avg = sum(element_scores) / len(element_scores) if element_scores else 0.0
-                min_es = min((es for es, _ in element_errors), default=1.0)
-                combined_msg = "; ".join(msg for _, msg in element_errors)
+                min_es, combined_msg = truncate_errors(element_errors)
                 # Only warn if there were actual mismatches
                 return avg, (min_es, combined_msg)
             elif isinstance(gold_val, dict):
@@ -288,8 +327,7 @@ def compare_json(
                         if s < 1.0:
                             element_errors.append((es, em))
                 avg = sum(element_scores) / len(element_scores) if element_scores else 0.0
-                min_es = min((es for es, _ in element_errors), default=1.0)
-                combined_msg = "; ".join(msg for _, msg in element_errors)
+                min_es, combined_msg = truncate_errors(element_errors)
                 return avg, (min_es, combined_msg)
             else:
                 # For other types, use strict equality
@@ -339,8 +377,7 @@ def compare_json(
                         element_errors.append((0.0, f"{field_path}[{i}]: no matching element found in output"))
                 if not element_errors:
                     return 1.0, (1.0, "")
-                min_es = min((es for es, _ in element_errors), default=1.0)
-                combined_msg = "; ".join(msg for _, msg in element_errors)
+                min_es, combined_msg = truncate_errors(element_errors)
                 return 0.0, (min_es, combined_msg)
             # Handle dict values - apply threshold recursively to each element using fuzzy key matching
             if isinstance(gold_val, dict):
@@ -364,8 +401,7 @@ def compare_json(
                         if s < 1.0:
                             element_errors.append((es, em))
                 avg = sum(element_scores) / len(element_scores) if element_scores else 0.0
-                min_es = min((es for es, _ in element_errors), default=1.0)
-                combined_msg = "; ".join(msg for _, msg in element_errors)
+                min_es, combined_msg = truncate_errors(element_errors)
                 return avg, (min_es, combined_msg)
             if not isinstance(output_val, (int, float)) or not isinstance(gold_val, (int, float)):
                 warn(f"{field_path}: type mismatch - output: {type(output_val).__name__} '{output_val}', gold: {type(gold_val).__name__} '{gold_val}'")
@@ -424,8 +460,7 @@ def compare_json(
 
             avg_score = sum(nested_scores) / len(nested_scores) if nested_scores else 0.0
             # Aggregate error_score as min of nested error_scores (worst error)
-            min_error_score = min(sev for sev, _ in nested_errors) if nested_errors else 1.0
-            error_msg = "; ".join([msg for _, msg in nested_errors]) if nested_errors else ""
+            min_error_score, error_msg = truncate_errors(nested_errors)
             return avg_score, (min_error_score, error_msg)
 
         # Unknown threshold type
@@ -665,12 +700,12 @@ def compare_json(
         if len(output_json_str) < 1000:
             result['output_data'] = output_data
         else:
-            result['output_data'] = output_json_str[:500] + f"\n... ({len(output_json_str)} characters total)"
+            result['output_data'] = output_json_str[:1000] + f"\n... ({len(output_json_str)} characters total)"
 
         if len(gold_json_str) < 1000:
             result['gold_data'] = gold_data
         else:
-            result['gold_data'] = gold_json_str[:500] + f"\n... ({len(gold_json_str)} characters total)"
+            result['gold_data'] = gold_json_str[:1000] + f"\n... ({len(gold_json_str)} characters total)"
     except Exception:
         pass  # If serialization fails, just skip adding data
 
@@ -820,8 +855,7 @@ def compare_json_normalized(
                         element_scores.append(0.0)
                         element_errors.append((1.0, f"{field_path}[{i}]: no matching element found in output"))
                 avg = sum(element_scores) / len(element_scores) if element_scores else 0.0
-                max_severity = max((es for es, _ in element_errors), default=0.0)
-                combined_msg = "; ".join(msg for _, msg in element_errors)
+                max_severity, combined_msg = truncate_errors(element_errors, mode='max')
                 return avg, (max_severity, combined_msg)
             else:
                 # For other types, use strict equality
@@ -870,8 +904,7 @@ def compare_json_normalized(
                         element_errors.append((1.0, f"{field_path}[{i}]: no matching element found in output"))
                 if not element_errors:
                     return 1.0, (0.0, "")
-                max_severity = max((es for es, _ in element_errors), default=0.0)
-                combined_msg = "; ".join(msg for _, msg in element_errors)
+                max_severity, combined_msg = truncate_errors(element_errors, mode='max')
                 return 0.0, (max_severity, combined_msg)
             # Handle dict values - apply threshold recursively to each element using fuzzy key matching
             if isinstance(gold_val, dict):
@@ -887,7 +920,7 @@ def compare_json_normalized(
                     if matched_key is None:
                         logging.warning(f"{field_path}.{key}: key not found in output dict")
                         element_scores.append(0.0)
-                        element_errors.append((0.0, f"{field_path}.{key}: key not found in output dict"))
+                        element_errors.append((1.0, f"{field_path}.{key}: key not found in output dict"))
                     else:
                         o = output_val[matched_key]
                         s, (es, em) = evaluate_field_normalized(o, g, threshold, f"{field_path}.{key}")
@@ -895,8 +928,7 @@ def compare_json_normalized(
                         if s < 1.0:
                             element_errors.append((es, em))
                 avg = sum(element_scores) / len(element_scores) if element_scores else 0.0
-                max_severity = max((es for es, _ in element_errors), default=0.0)
-                combined_msg = "; ".join(msg for _, msg in element_errors)
+                max_severity, combined_msg = truncate_errors(element_errors, mode='max')
                 return avg, (max_severity, combined_msg)
             if not isinstance(output_val, (int, float)) or not isinstance(gold_val, (int, float)):
                 logging.warning(f"{field_path}: type mismatch - expected number, got {type(output_val).__name__} '{output_val}'")
@@ -967,17 +999,16 @@ def compare_json_normalized(
                     logging.warning(f"{nested_path}: key not found in output (tried '{key}', available keys: {output_keys}), scoring 0 for all its fields")
                     # Key missing in output
                     nested_scores.append(0.0)
-                    nested_errors.append((0.0, f"{nested_path}: key not found in output"))
+                    nested_errors.append((1.0, f"{nested_path}: key not found in output"))
 
             avg_score = sum(nested_scores) / len(nested_scores) if nested_scores else 0.0
-            # Aggregate error_score as min of nested error_scores (worst error)
-            min_error_score = min(sev for sev, _ in nested_errors) if nested_errors else 1.0
-            error_msg = "; ".join([msg for _, msg in nested_errors]) if nested_errors else ""
-            return avg_score, (min_error_score, error_msg)
+            # Aggregate error_score as max of nested error_scores (worst error in normalized mode)
+            max_error_score, error_msg = truncate_errors(nested_errors, mode='max')
+            return avg_score, (max_error_score, error_msg)
 
         # Unknown threshold type
         logging.warning(f"{field_path}: unknown threshold type {type(threshold).__name__}")
-        return 0.0, (0.0, f"{field_path}: unknown threshold type {type(threshold).__name__}")
+        return 0.0, (1.0, f"{field_path}: unknown threshold type {type(threshold).__name__}")
 
     def traverse_thresholds_normalized(output_obj: Any, gold_obj: Any, threshold_obj: dict, obj_path: str = ""):
         """
@@ -1000,7 +1031,7 @@ def compare_json_normalized(
                         logging.warning(f"{field_path}: missing nested object in output (tried '{key}', available keys: {output_keys}), scoring 0 for all its fields")
                         field_count = count_nested_fields(threshold)
                         scores.extend([0.0] * field_count)
-                        errors.append((0.0, f"{field_path}: key not found"))
+                        errors.append((1.0, f"{field_path}: key not found"))
             else:
                 # Simple threshold - evaluate single field
                 gold_val = None
@@ -1017,7 +1048,7 @@ def compare_json_normalized(
                     # Field missing in output
                     logging.warning(f"{field_path}: key not found in output (tried '{key}', available keys: {output_keys}), scoring 0")
                     scores.append(0.0)
-                    errors.append((0.0, f"{field_path}: key not found in output"))
+                    errors.append((1.0, f"{field_path}: key not found in output"))
 
     # Start traversal from root
     traverse_thresholds_normalized(output_data, gold_data, thresholds)
@@ -1075,14 +1106,14 @@ def compare_json_normalized(
         if len(output_json_str) < 1000:
             result['output_data'] = output_data
         else:
-            result['output_data'] = output_json_str[:500] + f"\n... ({len(output_json_str)} characters total)"
+            result['output_data'] = output_json_str[:1000] + f"\n... ({len(output_json_str)} characters total)"
 
         if gold_file_name and gold_data is not None:
             gold_json_str = json.dumps(gold_data, indent=2)
             if len(gold_json_str) < 1000:
                 result['gold_data'] = gold_data
             else:
-                result['gold_data'] = gold_json_str[:500] + f"\n... ({len(gold_json_str)} characters total)"
+                result['gold_data'] = gold_json_str[:1000] + f"\n... ({len(gold_json_str)} characters total)"
     except Exception:
         pass  # If serialization fails, just skip adding data
 

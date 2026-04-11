@@ -77,7 +77,7 @@ class Evaluator:
 
         gold_id_dir = os.path.join(self.gold_dir, id)
 
-        if 'smolagents' in self.gold_dir:
+        if 'smolagents' in output_id_dir:
             code_file = os.path.join(output_id_dir, 'code.ipynb')
             code_content = {}
             try:

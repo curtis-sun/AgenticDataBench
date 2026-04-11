@@ -9,7 +9,6 @@ This module provides ML-specific evaluation:
 Reference: https://github.com/yiyihum/da-code/tree/main/da_agent/evaluators/metrics/ml.py
 """
 
-# import operator
 from typing import Optional, Union, Callable, Dict, Any
 import logging
 import numpy as np
@@ -413,12 +412,12 @@ def compare_model(
     if len(result_data_str) < 1000:
         result_data_content = result_data_str
     else:
-        result_data_content = result_data_str[:500] + f"\n... ({len(result_data_str)} characters total)"
+        result_data_content = result_data_str[:1000] + f"\n... ({len(result_data_str)} characters total)"
 
     if len(gold_data_str) < 1000:
         gold_data_content = gold_data_str
     else:
-        gold_data_content = gold_data_str[:500] + f"\n... ({len(gold_data_str)} characters total)"
+        gold_data_content = gold_data_str[:1000] + f"\n... ({len(gold_data_str)} characters total)"
 
     output_dict = {'score': normalized_score, 'errors': errors, 'meaning': meaning}
     if result_data_content is not None:

@@ -213,22 +213,33 @@ def compare_csv(output_file_name: str, gold_file_name, **options) -> Dict[str, A
                         normalized = [normalize_value(x, tol, is_relative=is_rel) for x in pred_col]
                         pred_normalized_sets.append(set(normalized))
 
-                    # Shuffle gold_col and find up to 50 unmatched values
+                    # Shuffle gold_col and find unmatched values (stop when count or string length limit reached)
                     shuffled_gold = gold_col.copy()
                     random.shuffle(shuffled_gold)
                     unmatched = []
+                    max_count = 50  # Maximum number of unmatched values
+                    max_str_len = 5000  # Maximum total string length for sample
                     for val in shuffled_gold:
                         val_norm = normalize_value(val, tol, is_relative=is_rel)
                         found_val = any(val_norm in pred_set for pred_set in pred_normalized_sets)
                         if not found_val:
                             unmatched.append(val)
-                        if len(unmatched) >= 50:  # Stop after finding 50
-                            break
+                            # Stop if count limit reached
+                            if len(unmatched) >= max_count:
+                                break
+                            # Stop if string length limit reached
+                            sample_str = ", ".join([str(v) for v in unmatched])
+                            if len(sample_str) >= max_str_len:
+                                break
 
                     if unmatched:
                         if len(unmatched) == len(gold_col) and all(isinstance(x, str) for x in gold_col):
                             logging.warning(f"Column '{col_name}': match score 0.0/1.0, all values unmatched")
-                        sample_str = ", ".join([str(v) for v in unmatched])
+                        full_str = ", ".join([str(v) for v in unmatched])
+                        if len(full_str) > max_str_len:
+                            sample_str = full_str[:max_str_len] + "..."
+                        else:
+                            sample_str = full_str
                         error_msg = f"Column '{col_name}' does not match: expected values {sample_str} but none found in prediction (score_rule='all' requires all columns to match)"
                     else:
                         error_msg = f"Column '{col_name}' does not match: values are completely different from expected (score_rule='all' requires all columns to match)"
@@ -261,22 +272,33 @@ def compare_csv(output_file_name: str, gold_file_name, **options) -> Dict[str, A
                         normalized = [normalize_value(x, tol, is_relative=is_rel) for x in pred_col]
                         pred_normalized_sets.append(set(normalized))
 
-                    # Shuffle gold_col and find up to 50 unmatched values
+                    # Shuffle gold_col and find unmatched values (stop when count or string length limit reached)
                     shuffled_gold = gold_col.copy()
                     random.shuffle(shuffled_gold)
                     unmatched = []
+                    max_count = 50  # Maximum number of unmatched values
+                    max_str_len = 5000  # Maximum total string length for sample
                     for val in shuffled_gold:
                         val_norm = normalize_value(val, tol, is_relative=is_rel)
                         found_val = any(val_norm in pred_set for pred_set in pred_normalized_sets)
                         if not found_val:
                             unmatched.append(val)
-                        if len(unmatched) >= 50:  # Stop after finding 50
-                            break
+                            # Stop if count limit reached
+                            if len(unmatched) >= max_count:
+                                break
+                            # Stop if string length limit reached
+                            sample_str = ", ".join([str(v) for v in unmatched])
+                            if len(sample_str) >= max_str_len:
+                                break
 
                     if unmatched:
                         if len(unmatched) == len(gold_col) and all(isinstance(x, str) for x in gold_col):
                             logging.warning(f"{col_name}: no values matched, scoring 0 for entire column")
-                        sample_str = ", ".join([str(v) for v in unmatched])
+                        full_str = ", ".join([str(v) for v in unmatched])
+                        if len(full_str) > max_str_len:
+                            sample_str = full_str[:max_str_len] + "..."
+                        else:
+                            sample_str = full_str
                         error_msg = f"Column '{col_name}' does not match: expected values {sample_str} but none found in prediction (score_rule='divide' scores each column independently)"
                     else:
                         error_msg = f"Column '{col_name}' does not match: values are completely different from expected (score_rule='divide' scores each column independently)"
@@ -379,12 +401,12 @@ def compare_csv(output_file_name: str, gold_file_name, **options) -> Dict[str, A
         if len(output_str) < 1000:
             output_data = output_str
         else:
-            output_data = output_str[:500] + f"\n... ({len(output_str)} characters total)"
+            output_data = output_str[:1000] + f"\n... ({len(output_str)} characters total)"
 
         if len(gold_str) < 1000:
             gold_data = gold_str
         else:
-            gold_data = gold_str[:500] + f"\n... ({len(gold_str)} characters total)"
+            gold_data = gold_str[:1000] + f"\n... ({len(gold_str)} characters total)"
 
         # Resolve threshold column names to indices using gold file columns
         resolved_thresholds = resolve_threshold_keys(thresholds, df2)

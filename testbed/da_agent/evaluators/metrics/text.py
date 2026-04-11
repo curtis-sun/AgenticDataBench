@@ -72,12 +72,12 @@ def compare_text(
     if len(output_text) < 1000:
         output_data = output_text
     else:
-        output_data = output_text[:500] + f"\n... ({len(output_text)} characters total)"
+        output_data = output_text[:1000] + f"\n... ({len(output_text)} characters total)"
 
     if len(reference_text) < 1000:
         gold_data = reference_text
     else:
-        gold_data = reference_text[:500] + f"\n... ({len(reference_text)} characters total)"
+        gold_data = reference_text[:1000] + f"\n... ({len(reference_text)} characters total)"
 
     if output_normalized != reference_normalized:
         # Provide detailed error information
