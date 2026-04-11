@@ -24,13 +24,18 @@ We deeply appreciate the invaluable effort contributed by our dedicated team of 
 - [Tsinghua University](https://www.tsinghua.edu.cn/en)
 - [Ant Digital Technologies, Ant Group](https://intl.antdigital.com/en)
 
+## 📁 Benchmark Data
+
+- **Datasets**: [Download from HuggingFace](https://huggingface.co/datasets/shawnzzzh/AgenticDataBench) → `testbed/datasets/`
+- **Skills**: [`skill_cluster/data/skill-descriptions.jsonl`](./skill_cluster/data/skill-descriptions.jsonl)
+- **Tasks**: [`testbed/tasks`](./testbed/tasks)
+- **Ground-truth**: [`testbed/gold`](./testbed/gold)
+
+For leaderboard integrity, we withhold 100 tasks as a private test set. These tasks will be publicly released once the benchmark loses its evaluation significance.
+
 <span id="-quickstart"></span>
 
 ## Quickstart
-
-### 📦 Data Downloading
-
-Download the domain datasets from [HuggingFace](https://huggingface.co/datasets/shawnzzzh/AgenticDataBench) and unzip into `testbed/datasets/`.
 
 ### 🔑 Set API Keys
 
@@ -70,10 +75,10 @@ python3 evaluate.py --output_dir output/da-agent-qwen-{experiment_id}
 <img src="docs/img/pipeline.png" width="400px">
 </div>
 
-## 📋 Test Set
-
-For leaderboard integrity, we withhold 100 tasks as a private test set. These tasks will be publicly released once the benchmark loses its evaluation significance.
-
 ## 📊 Result Uploading
 
-Benchmark results are stored in `testbed/results`.
+Benchmark results are stored in `testbed/results`. Initial experiments cover [Qwen3.5-397B-A17B](https://huggingface.co/Qwen/Qwen3.5-397B-A17B), [Kimi-K2.5](https://huggingface.co/moonshotai/Kimi-K2.5), and [Claude Sonnet 4.6](https://platform.claude.com/docs/en/about-claude/models/overview) across [DA-Agent](https://github.com/yiyihum/da-code/tree/main) and [smolagents](https://github.com/huggingface/smolagents) frameworks.
+
+<div align="center">
+<img src="docs/img/cost_score_scatter.png" width="400px">
+</div>
